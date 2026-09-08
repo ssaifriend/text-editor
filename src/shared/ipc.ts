@@ -85,6 +85,12 @@ export const DirtyEntry = z.object({
 })
 export type DirtyEntry = z.infer<typeof DirtyEntry>
 
+export const CloseChoice = z.enum(['save', 'dontSave', 'cancel'])
+export type CloseChoice = z.infer<typeof CloseChoice>
+
+export const CommandRun = z.object({ id: z.string(), args: z.unknown().optional() })
+export type CommandRun = z.infer<typeof CommandRun>
+
 export const Bootstrap = z.object({ paths: z.array(z.string()), test: z.boolean() })
 export type Bootstrap = z.infer<typeof Bootstrap>
 
@@ -94,6 +100,10 @@ export const contracts = {
   'fs.save': { request: SaveRequest, response: ipcResult(SavedMeta, SaveError) },
   'dialog.openFile': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.saveFile': { request: z.string().nullable(), response: ipcResult(DialogResult, UnexpectedError) },
+  'dialog.confirmClose': {
+    request: z.object({ title: z.string() }),
+    response: ipcResult(z.object({ choice: CloseChoice }), UnexpectedError),
+  },
   'config.get': { request: z.undefined(), response: ipcResult(ConfigSnapshot, UnexpectedError) },
   'dirty.write': { request: DirtyEntry, response: ipcResult(z.literal(true), UnexpectedError) },
   'dirty.clear': { request: z.string(), response: ipcResult(z.literal(true), UnexpectedError) },
@@ -109,6 +119,7 @@ export type ErrorOf<C extends InvokeChannel> = Extract<ResponseOf<C>, { ok: fals
 
 export const pushContracts = {
   'config.changed': ConfigSnapshot,
+  'command.run': CommandRun,
 } as const
 export type PushChannel = keyof typeof pushContracts
 export type PushPayload<C extends PushChannel> = z.infer<(typeof pushContracts)[C]>

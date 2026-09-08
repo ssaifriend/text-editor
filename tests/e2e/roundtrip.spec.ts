@@ -24,7 +24,7 @@ for (const fixture of fixtures) {
     await expect(page.getByTestId('encoding')).toHaveText(fixture.encoding)
     await expect(page.getByTestId('eol')).toHaveText(fixture.eol)
 
-    await page.getByTestId('save').click()
+    await page.evaluate(() => window.__moruTest!.runCommand('file.save'))
     await expect(page.getByTestId('status')).toContainText('saved')
 
     expect(Buffer.compare(readFileSync(path), fixture.bytes)).toBe(0)
@@ -43,7 +43,7 @@ test('edits are written back in the original encoding and eol', async () => {
   await page.evaluate(() => window.__moruTest!.focus())
   await page.evaluate(() => window.__moruTest!.setCursor(2))
   await page.keyboard.type('나')
-  await page.getByTestId('save').click()
+  await page.evaluate(() => window.__moruTest!.runCommand('file.save'))
   await expect(page.getByTestId('status')).toContainText('saved')
 
   expect(Buffer.compare(readFileSync(path), iconv.encode('가\r\n나', 'cp949'))).toBe(0)
@@ -62,7 +62,7 @@ test('a file changed on disk is reported as a conflict and not overwritten', asy
   await page.evaluate(() => window.__moruTest!.focus())
   await page.evaluate(() => window.__moruTest!.setCursor(0))
   await page.keyboard.type('x')
-  await page.getByTestId('save').click()
+  await page.evaluate(() => window.__moruTest!.runCommand('file.save'))
 
   await expect(page.getByTestId('status')).toContainText('conflict')
   expect(readFileSync(path, 'utf8')).toBe('v2 from agent\n')

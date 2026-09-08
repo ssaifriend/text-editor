@@ -1,4 +1,5 @@
 import { dialog } from 'electron'
+import { CloseChoice } from '@shared/ipc'
 import { ok } from '@shared/result'
 import type { ConfigService } from '../config/service'
 import { readTextFile } from '../fs/read'
@@ -29,6 +30,20 @@ export const registerHandlers = ({ config, dirty, startupPaths }: HandlerDeps): 
   handle('dialog.saveFile', async (defaultPath) => {
     const { canceled, filePath } = await dialog.showSaveDialog({ defaultPath: defaultPath ?? undefined })
     return ok({ path: canceled || !filePath ? null : filePath })
+  })
+
+  handle('dialog.confirmClose', async ({ title }) => {
+    if (isTest) return ok({ choice: CloseChoice.parse(process.env['MORU_TEST_CONFIRM'] ?? 'dontSave') })
+
+    const { response } = await dialog.showMessageBox({
+      type: 'warning',
+      message: `Save changes to ${title}?`,
+      buttons: ['Save', "Don't Save", 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+    })
+    const choices: CloseChoice[] = ['save', 'dontSave', 'cancel']
+    return ok({ choice: choices[response] ?? 'cancel' })
   })
 
   handle('config.get', async () => ok(config.snapshot()))

@@ -1,5 +1,5 @@
 import { existsSync, statSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { delimiter, resolve } from 'node:path'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { A, pipe } from '@mobily/ts-belt'
@@ -22,8 +22,7 @@ if (userDataOverride) app.setPath('userData', userDataOverride)
 const isExistingFile = (path: string): boolean => existsSync(path) && statSync(path).isFile()
 
 const startupPaths = (): readonly string[] => {
-  const testOpen = process.env['MORU_TEST_OPEN']
-  const fromEnv = testOpen ? [testOpen] : []
+  const fromEnv = (process.env['MORU_TEST_OPEN'] ?? '').split(delimiter).filter((p) => p.length > 0)
   const fromArgv = pipe(
     process.argv.slice(is.dev ? 2 : 1),
     A.filter((arg) => !arg.startsWith('-')),

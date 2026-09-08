@@ -22,7 +22,7 @@ test('opens the bootstrap file and saves edits back to disk', async () => {
   await page.keyboard.type('// edited\n')
   await expect(page.getByTestId('pos')).toHaveText('Ln 2, Col 1')
 
-  await page.getByTestId('save').click()
+  await page.evaluate(() => window.__moruTest!.runCommand('file.save'))
   await expect(page.getByTestId('status')).toContainText('saved')
 
   expect(readFileSync(target, 'utf8')).toBe(`// edited\n${readFileSync(fixture, 'utf8')}`)

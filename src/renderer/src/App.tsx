@@ -1,141 +1,81 @@
-import { createSignal, onMount } from 'solid-js'
+import { createSignal, onCleanup, onMount } from 'solid-js'
 import { R } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
-import { encodingLabel, eolLabel } from '@shared/encoding'
-import type { OpenedFile, SaveError } from '@shared/ipc'
-import { createEditor, type Editor } from './editor/createEditor'
-import { cursorPosition, type CursorPosition } from './editor/cursor'
-import { languageFor } from './editor/lang'
-import { invoke } from './ipc'
+import { whenContext } from './app/context'
+import { registerAppCommands } from './app/registerCommands'
+import { installKeymap } from './app/useKeymap'
+import { createWorkspace, type CloseChoice } from './app/workspace'
+import { createCommandRegistry } from './commands/registry'
+import { invoke, on } from './ipc'
+import { compileBindings } from './keymap/bindings'
+import { defaultBindings } from './keymap/defaults'
+import type { Platform } from './keymap/keys'
 import { installTestHooks } from './testHooks'
+import { PaneView } from './ui/layout/PaneView'
+import { CommandPalette } from './ui/palette/CommandPalette'
+import { StatusBar } from './ui/statusbar/StatusBar'
 
-export type FileMeta = Omit<OpenedFile, 'text'>
-
-type SaveMode = 'normal' | 'overwrite'
-
-const describeSaveError = (error: SaveError): string => {
-  switch (error.kind) {
-    case 'conflict':
-      return 'conflict: file changed on disk (use overwrite to replace it)'
-    case 'encodingLossy':
-      return `encoding cannot represent ${error.positions.length} character(s); save as UTF-8?`
-    case 'readonly':
-      return `read-only: ${error.message}`
-    default:
-      return `save failed: ${error.message}`
-  }
-}
+const platform = (): Platform => (navigator.platform.toLowerCase().includes('mac') ? 'mac' : 'win')
 
 export const App = () => {
-  const [meta, setMeta] = createSignal<FileMeta | null>(null)
-  const [pos, setPos] = createSignal<CursorPosition>({ line: 1, col: 1 })
-  const [status, setStatus] = createSignal('')
+  const [paletteOpen, setPaletteOpen] = createSignal(false)
 
-  let host!: HTMLDivElement
-  let editor!: Editor
+  const ws = createWorkspace({
+    confirmClose: async (title): Promise<CloseChoice> => {
+      const result = await invoke('dialog.confirmClose', { title })
+      return R.match(
+        result,
+        (r) => r.choice,
+        () => 'cancel' as const,
+      )
+    },
+  })
 
-  const openPath = async (target: string): Promise<void> => {
-    const result = await invoke('fs.open', { path: target })
+  const context = () => whenContext(ws, { paletteOpen: paletteOpen() })
+  const registry = createCommandRegistry(context)
+  registerAppCommands(registry, ws, { openPalette: () => setPaletteOpen(true) })
 
-    R.match(
-      result,
-      ({ text, ...rest }) => {
-        editor.setDoc(text, languageFor(rest.path).load())
-        setMeta(rest)
-        setStatus(`opened ${rest.path}`)
-      },
-      (error) => setStatus(`open failed: ${error.message}`),
-    )
-  }
-
-  const open = async (): Promise<void> => {
-    const picked = await invoke('dialog.openFile', undefined)
-    R.tap(picked, ({ path }) => {
-      if (path) void openPath(path)
-    })
-  }
-
-  const pickSavePath = async (): Promise<string | null> => {
-    const picked = await invoke('dialog.saveFile', meta()?.path ?? null)
-    return R.match(picked, (d) => d.path, () => null)
-  }
-
-  const save = async (mode: SaveMode = 'normal'): Promise<void> => {
-    const current = meta()
-    const target = current?.path ?? (await pickSavePath())
-    if (!target) return
-
-    const encoding = current?.encoding ?? 'utf8'
-    const bom = current?.bom ?? false
-    const eol = current?.eol ?? 'lf'
-
-    const result = await invoke('fs.save', {
-      path: target,
-      text: editor.view.state.doc.toString(),
-      encoding,
-      bom,
-      eol,
-      expectedHash: current?.path === target ? current.hash : null,
-      mode,
-    })
-
-    R.match(
-      result,
-      (saved) => {
-        setMeta({
-          path: saved.path,
-          encoding,
-          bom,
-          eol,
-          mixedEol: false,
-          confidence: 'high',
-          hash: saved.hash,
-          mtimeMs: saved.mtimeMs,
-          readonly: false,
-          largeFile: current?.largeFile ?? false,
-        })
-        setStatus(`saved ${saved.bytes} bytes`)
-      },
-      (error) => setStatus(describeSaveError(error)),
-    )
-  }
+  const bindings = compileBindings(defaultBindings(platform()), platform())
 
   onMount(async () => {
-    editor = createEditor(host, (state) => setPos(cursorPosition(state)))
+    const uninstall = installKeymap(window, () => bindings, registry, context)
+    const offCommand = on('command.run', ({ id, args }) => void registry.run(id, args))
+    onCleanup(() => {
+      uninstall()
+      offCommand()
+    })
+
     requestAnimationFrame(() => window.moru.send(channels.perfFirstPaint, undefined))
 
     const bootstrap = await invoke('app.bootstrap', undefined)
-    R.tap(bootstrap, ({ paths, test }) => {
-      if (test) installTestHooks(editor, { path: () => meta()?.path ?? null, meta, save })
-      const last = paths.at(-1)
-      if (last) void openPath(last)
-    })
+    await R.match(
+      bootstrap,
+      async ({ paths, test }) => {
+        if (test) installTestHooks(ws, registry, paletteOpen)
+        for (const path of paths) await ws.openFile(path)
+        if (paths.length === 0) ws.newUntitled()
+        ws.activeView()?.focus()
+      },
+      async () => ws.newUntitled(),
+    )
   })
-
-  const encodingText = (): string => {
-    const current = meta()
-    return current ? encodingLabel(current.encoding, current.bom) : ''
-  }
-
-  const eolText = (): string => {
-    const current = meta()
-    return current ? eolLabel(current.eol) : ''
-  }
 
   return (
     <div class="app">
-      <div class="toolbar">
-        <button data-testid="open" onClick={open}>Open</button>
-        <button data-testid="save" onClick={() => save()}>Save</button>
-        <span class="path" data-testid="path">{meta()?.path ?? 'untitled'}</span>
+      <div class="workspace">
+        <PaneView ws={ws} node={ws.tree} />
       </div>
-      <div class="editor" ref={host} />
-      <div class="statusbar">
-        <span data-testid="pos">Ln {pos().line}, Col {pos().col}</span>
-        <span data-testid="encoding">{encodingText()}</span>
-        <span data-testid="eol">{eolText()}</span>
-        <span data-testid="status">{status()}</span>
-      </div>
+      <StatusBar ws={ws} />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => {
+          setPaletteOpen(false)
+          ws.activeView()?.focus()
+        }}
+        registry={registry}
+        bindings={bindings}
+        platform={platform()}
+      />
     </div>
   )
 }

@@ -20,7 +20,7 @@ html, body, #root {
   height: 100%;
 }
 
-.toolbar, .statusbar {
+.statusbar {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -29,11 +29,6 @@ html, body, #root {
   flex: 0 0 auto;
 }
 
-.editor {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
-}
 
 .cm-editor {
   height: 100%;
@@ -42,3 +37,89 @@ html, body, #root {
 .cm-scroller {
   font-family: var(--font-mono);
 }
+
+.workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.split {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.split.row { flex-direction: row; }
+.split.col { flex-direction: column; }
+
+.split-child {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+.gutter {
+  flex: 0 0 4px;
+  background: var(--bar);
+}
+
+.gutter.row { cursor: col-resize; }
+.gutter.col { cursor: row-resize; }
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid transparent;
+}
+
+.pane.active {
+  border-color: #3d4450;
+}
+
+.tabs {
+  display: flex;
+  overflow-x: auto;
+  background: var(--bar);
+  flex: 0 0 auto;
+  min-height: 28px;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: #9aa3ad;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tab.active {
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.tab-dirty { display: none; color: #e6c07b; }
+.tab.dirty .tab-dirty { display: inline; }
+
+.tab-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.editor-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.statusbar .grow { flex: 1 1 auto; text-align: right; opacity: 0.7; }
