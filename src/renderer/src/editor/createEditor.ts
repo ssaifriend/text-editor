@@ -16,6 +16,38 @@ import {
 } from '@codemirror/view'
 import { compositionObserver } from './compositionObserver'
 
+export type ViewHooks = {
+  readonly onUpdate: (state: EditorState, view: EditorView) => void
+  readonly onFocusChange: (view: EditorView, focused: boolean) => void
+}
+
+export const baseExtensions = (language: Extension, hooks: ViewHooks): Extension => [
+  lineNumbers(),
+  highlightActiveLineGutter(),
+  highlightActiveLine(),
+  history(),
+  drawSelection(),
+  EditorState.allowMultipleSelections.of(true),
+  rectangularSelection(),
+  crosshairCursor(),
+  indentOnInput(),
+  bracketMatching(),
+  closeBrackets(),
+  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+  highlightSelectionMatches(),
+  keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
+  compositionObserver,
+  language,
+  EditorView.updateListener.of((update) => {
+    if (update.docChanged || update.selectionSet || update.focusChanged) hooks.onUpdate(update.state, update.view)
+    if (update.focusChanged) hooks.onFocusChange(update.view, update.view.hasFocus)
+  }),
+]
+
+export const makeState = (doc: string, extensions: Extension): EditorState => EditorState.create({ doc, extensions })
+
+export const createView = (parent: HTMLElement, state: EditorState): EditorView => new EditorView({ state, parent })
+
 export type Editor = {
   readonly view: EditorView
   readonly setDoc: (text: string, language: Extension) => void
@@ -23,42 +55,15 @@ export type Editor = {
 }
 
 export const createEditor = (parent: HTMLElement, onUpdate: (state: EditorState) => void): Editor => {
-  const language = new Compartment()
   const whitespace = new Compartment()
+  const hooks: ViewHooks = { onUpdate: (state) => onUpdate(state), onFocusChange: () => undefined }
+  const extensionsFor = (lang: Extension): Extension => [baseExtensions(lang, hooks), whitespace.of([])]
 
-  const extensionsFor = (lang: Extension, ws: Extension): Extension => [
-    lineNumbers(),
-    highlightActiveLineGutter(),
-    highlightActiveLine(),
-    history(),
-    drawSelection(),
-    EditorState.allowMultipleSelections.of(true),
-    rectangularSelection(),
-    crosshairCursor(),
-    indentOnInput(),
-    bracketMatching(),
-    closeBrackets(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    highlightSelectionMatches(),
-    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
-    compositionObserver,
-    language.of(lang),
-    whitespace.of(ws),
-    EditorView.updateListener.of((update) => onUpdate(update.state)),
-  ]
+  const view = createView(parent, makeState('', extensionsFor([])))
 
-  const view = new EditorView({
-    state: EditorState.create({ doc: '', extensions: extensionsFor([], []) }),
-    parent,
-  })
-
-  const setDoc = (text: string, lang: Extension): void => {
-    view.setState(EditorState.create({ doc: text, extensions: extensionsFor(lang, []) }))
+  return {
+    view,
+    setDoc: (text, lang) => view.setState(makeState(text, extensionsFor(lang))),
+    setWhitespace: (on) => view.dispatch({ effects: whitespace.reconfigure(on ? highlightWhitespace() : []) }),
   }
-
-  const setWhitespace = (on: boolean): void => {
-    view.dispatch({ effects: whitespace.reconfigure(on ? highlightWhitespace() : []) })
-  }
-
-  return { view, setDoc, setWhitespace }
 }
