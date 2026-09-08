@@ -15,6 +15,7 @@ export const createWindow = (bounds: WindowBounds | null = null): BrowserWindow 
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
+      backgroundThrottling: process.env['MORU_HIDDEN'] !== '1',
     },
   })
 

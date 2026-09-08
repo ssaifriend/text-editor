@@ -54,6 +54,8 @@ export type MoruTestHooks = {
   previewScrollLine(): number | null
   previewTabs(): number
   gotoLineTop(line: number): void
+  timeOpen(path: string): Promise<number>
+  latencyProbe(action: 'start' | 'stop'): number[]
 }
 
 declare global {
@@ -61,6 +63,9 @@ declare global {
     __moruTest?: MoruTestHooks
   }
 }
+
+let latencySamples: number[] = []
+let latencyListener: ((e: KeyboardEvent) => void) | null = null
 
 export const installTestHooks = (
   ws: Workspace,
@@ -163,6 +168,26 @@ export const installTestHooks = (
       return body ? lineForScrollTop(body, body.scrollTop) : null
     },
     previewTabs: () => Object.values(ws.state.tabs).filter((t) => t.kind === 'preview').length,
+    timeOpen: async (path) => {
+      const started = performance.now()
+      await ws.openFile(path)
+      return performance.now() - started
+    },
+    latencyProbe: (action) => {
+      if (action === 'start') {
+        latencySamples = []
+        latencyListener = (e: KeyboardEvent) => {
+          const at = performance.now()
+          if (e.key.length !== 1) return
+          requestAnimationFrame(() => latencySamples.push(performance.now() - at))
+        }
+        window.addEventListener('keydown', latencyListener, true)
+        return []
+      }
+      if (latencyListener) window.removeEventListener('keydown', latencyListener, true)
+      latencyListener = null
+      return [...latencySamples]
+    },
     gotoLineTop: (line) => {
       const v = view()
       const target = v.state.doc.line(Math.min(Math.max(1, line), v.state.doc.lines))

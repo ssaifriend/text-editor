@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { createMatcher } from '../../../src/main/index/service'
@@ -18,8 +19,9 @@ describe('index matcher', () => {
     const started = performance.now()
     const items = m.query('mod12fil', 50)
     const elapsed = performance.now() - started
-    console.log(`fzf 50k query: ${elapsed.toFixed(1)} ms`)
+    mkdirSync('test-results', { recursive: true })
+    writeFileSync('test-results/perf-index.json', JSON.stringify({ paths: 50_000, queryMs: Number(elapsed.toFixed(1)) }))
     expect(items.length).toBeGreaterThan(0)
-    expect(elapsed).toBeLessThan(process.env.CI ? 300 : 90)
+    expect(elapsed).toBeLessThan(process.env['CI'] ? 60 : 30)
   })
 })

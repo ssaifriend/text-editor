@@ -187,7 +187,7 @@ export const registerHandlers = ({
 
   handle('pty.spawn', async ({ cwd, cols, rows }, { sender }) => {
     const dir = cwd && existsSync(cwd) ? cwd : home
-    const { id, pid } = pty.spawn({ cwd: dir, cols, rows, owner: sender })
+    const { id, pid } = await pty.spawn({ cwd: dir, cols, rows, owner: sender })
     return ok({ id, pid, cwd: dir })
   })
 

@@ -9,7 +9,7 @@ export type IndexItem = { readonly rel: string; readonly path: string; readonly 
 export type Matcher = { readonly query: (text: string, limit: number) => IndexItem[]; readonly size: number }
 
 export const createMatcher = (rel: readonly string[], root: string): Matcher => {
-  const fzf = new Fzf(rel as string[], { selector: (s) => s, limit: 200, casing: 'smart-case' })
+  const fzf = new Fzf(rel as string[], { selector: (s) => s, limit: 200, casing: 'smart-case', fuzzy: 'v1' })
   return {
     size: rel.length,
     query: (text, limit) =>

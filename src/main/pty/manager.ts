@@ -7,7 +7,7 @@ type Push = <C extends PushChannel>(owner: WebContents, channel: C, payload: Pus
 
 type Deps = {
   readonly push: Push
-  readonly env: Record<string, string>
+  readonly env: () => Promise<Record<string, string>>
   readonly shell: string
   readonly stallMs?: number
 }
@@ -23,7 +23,7 @@ type Entry = {
 export type SpawnOptions = { readonly cwd: string; readonly cols: number; readonly rows: number; readonly owner: WebContents }
 
 export type PtyManager = {
-  readonly spawn: (options: SpawnOptions) => { id: string; pid: number }
+  readonly spawn: (options: SpawnOptions) => Promise<{ id: string; pid: number }>
   readonly write: (id: string, data: string) => void
   readonly resize: (id: string, cols: number, rows: number) => void
   readonly kill: (id: string) => void
@@ -50,9 +50,9 @@ export const createPtyManager = ({ push, env, shell, stallMs = 5000 }: Deps): Pt
     }, stallMs)
   }
 
-  const spawn = ({ cwd, cols, rows, owner }: SpawnOptions): { id: string; pid: number } => {
+  const spawn = async ({ cwd, cols, rows, owner }: SpawnOptions): Promise<{ id: string; pid: number }> => {
     const id = `pty${(counter += 1)}`
-    const proc = pty.spawn(shell, [], { name: 'xterm-256color', cols, rows, cwd, env })
+    const proc = pty.spawn(shell, [], { name: 'xterm-256color', cols, rows, cwd, env: await env() })
     const entry: Entry = { proc, flow: createFlowControl(), owner, alive: true, stall: null }
     entries = { ...entries, [id]: entry }
 

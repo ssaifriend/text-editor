@@ -20,6 +20,9 @@ const api = {
     ipcRenderer.on(channel, wrapped)
     return () => ipcRenderer.removeListener(channel, wrapped)
   },
+
+  memory: (): Promise<{ privateMb: number; sharedMb: number }> =>
+    process.getProcessMemoryInfo().then((m) => ({ privateMb: Math.round(m.private / 1024), sharedMb: Math.round(m.shared / 1024) })),
 }
 
 contextBridge.exposeInMainWorld('moru', api)

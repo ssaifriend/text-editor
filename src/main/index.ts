@@ -79,9 +79,11 @@ app.whenReady().then(async () => {
 
   const dirty = createDirtyStore(userData)
   const shell = defaultShell(process.platform)
-  const env = await resolveShellEnv({ platform: process.platform, shell, spawn: execFile })
-  logger.info('shell env resolved', { shell, pathEntries: (env['PATH'] ?? '').split(':').length })
-  const ptyManager = createPtyManager({ push: pushTo, env, shell })
+  const envPromise = resolveShellEnv({ platform: process.platform, shell, spawn: execFile }).then((env) => {
+    logger.info('shell env resolved', { shell, pathEntries: (env['PATH'] ?? '').split(delimiter).length })
+    return env
+  })
+  const ptyManager = createPtyManager({ push: pushTo, env: () => envPromise, shell })
   const expected = createExpectedWrites()
   const watch = createWatchService({ subscribe: watcher.subscribe, push: pushToAll, expected })
   app.on('before-quit', () => {
