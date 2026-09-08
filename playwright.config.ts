@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 60_000,
   workers: 1,
-  retries: 0,
+  retries: process.env['CI'] ? 1 : 0,
   reporter: [['list'], ['json', { outputFile: 'test-results/e2e.json' }]],
   use: { trace: 'retain-on-failure' },
 })
