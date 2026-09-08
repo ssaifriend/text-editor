@@ -67,7 +67,7 @@ createSessionStore(userData, { debounceMs = 300 }) → { load(): Promise<Session
 ```
 Channels: `session.save` (send) payload `WindowSnapshot`; `session.load` (invoke) → `SessionFile | null` (not needed by renderer in M3a but handy for tests); `Bootstrap` gains `session: WindowSnapshot | null`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/shared/hash.test.ts`:
 ```ts
@@ -159,9 +159,9 @@ describe('session store', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure** → FAIL.
+- [x] **Step 2: Run to verify failure** → FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/shared/hash.ts`:
 ```ts
@@ -312,9 +312,9 @@ export const createSessionStore = (userData: string, { debounceMs = 300 }: { deb
 
 Channels/contracts: `sessionSave: 'session.save'` in `sendChannels` with a shared `SessionSave = WindowSnapshot` payload validated by an `ipcMain.on` in handlers (`session.save` handler looks up the sender's window, reads `window.getBounds()`, calls `store.update`); `sessionLoad: 'session.load'` invoke → `SessionFile.nullable()`. `Bootstrap` gains `session: WindowSnapshot.nullable()`.
 
-- [ ] **Step 4: Run** — unit PASS, typecheck PASS.
+- [x] **Step 4: Run** — unit PASS, typecheck PASS.
 
-- [ ] **Step 5: Commit** — `feat(session): session schema, text hash, and debounced session store`
+- [x] **Step 5: Commit** — `feat(session): session schema, text hash, and debounced session store`
 
 ---
 
@@ -340,7 +340,7 @@ Channels/contracts: `sessionSave: 'session.save'` in `sendChannels` with a share
 - Restore ordering in `App.tsx`: `restoreSession(boot.session, dirtyEntries)` replaces `restoreDirty()` when a session exists; otherwise fall back to `restoreDirty()`; then startup paths; then `installSessionSync`.
 - Test hooks: `layout(): PaneSnapshot-like` (reuse `tabs()`), `scrollTop(): number`, `snapshotNow(): WindowSnapshot` (for assertions).
 
-- [ ] **Step 1: Write the failing E2E**
+- [x] **Step 1: Write the failing E2E**
 
 `tests/e2e/session.spec.ts`:
 ```ts
@@ -428,9 +428,9 @@ test('two windows come back as two windows after SIGKILL', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure** → FAIL.
+- [x] **Step 2: Run to verify failure** → FAIL.
 
-- [ ] **Step 3: Implement** — as in Interfaces. Key code sketches:
+- [x] **Step 3: Implement** — as in Interfaces. Key code sketches:
 
 `treeFromSnapshot`:
 ```ts
@@ -468,9 +468,9 @@ await sessionStore.markCleanExit(false)
 ```
 `openWindow(paths, root, snapshot, bounds)`; `createWindow(bounds?)` applies bounds when given.
 
-- [ ] **Step 4: Run** — `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test tests/e2e/session.spec.ts tests/e2e/recovery.spec.ts tests/e2e/windows.spec.ts tests/e2e/tabs.spec.ts` → PASS. The existing `recovery.spec.ts` must still pass: with a session present, restore goes through `restoreSession` (which uses the dirty store for text).
+- [x] **Step 4: Run** — `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test tests/e2e/session.spec.ts tests/e2e/recovery.spec.ts tests/e2e/windows.spec.ts tests/e2e/tabs.spec.ts` → PASS. The existing `recovery.spec.ts` must still pass: with a session present, restore goes through `restoreSession` (which uses the dirty store for text).
 
-- [ ] **Step 5: Commit** — `feat(session): hot exit with layout, tabs, selection, scroll, undo history, and multi-window restore`
+- [x] **Step 5: Commit** — `feat(session): hot exit with layout, tabs, selection, scroll, undo history, and multi-window restore`
 
 ---
 
@@ -486,7 +486,7 @@ await sessionStore.markCleanExit(false)
 - `skipOccurrence: Command` — removes the most recently added range (the main one) and selects the next occurrence after it (uses `selectNextOccurrence` after dropping).
 - Bindings: `mod+shift+l` split, `ctrl+shift+arrowup/arrowdown` add cursor (mac) / `ctrl+alt+arrowup/arrowdown` (win), `mod+k mod+d` skip.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/renderer/multicursor.test.ts`:
 ```ts
@@ -553,9 +553,9 @@ test('split selection into lines then type at every cursor', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure** → FAIL.
+- [x] **Step 2: Run to verify failure** → FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add to `src/renderer/src/editor/commands.ts`:
 ```ts
@@ -601,9 +601,9 @@ Note `skipOccurrence` relies on `selectNextOccurrence` searching from the new ma
 
 Register: `editor.splitSelectionIntoLines` (Split Selection into Lines), `editor.addCursorAbove`, `editor.addCursorBelow`, `editor.skipOccurrence` (Quick Skip Next). Defaults: common `editor('mod+shift+l', 'editor.splitSelectionIntoLines')`, `editor('mod+k mod+d', 'editor.skipOccurrence')`; mac `editor('ctrl+shift+arrowup', 'editor.addCursorAbove')`/down; win `editor('ctrl+alt+arrowup', ...)`/down.
 
-- [ ] **Step 4: Run** — unit + e2e PASS; `defaultBindings` conflict test still PASS (win `ctrl+shift+arrowup` is `moveLineUp` — hence `ctrl+alt` for add-cursor on win).
+- [x] **Step 4: Run** — unit + e2e PASS; `defaultBindings` conflict test still PASS (win `ctrl+shift+arrowup` is `moveLineUp` — hence `ctrl+alt` for add-cursor on win).
 
-- [ ] **Step 5: Commit** — `feat(editor): split selection into lines, add cursor above/below, skip occurrence`
+- [x] **Step 5: Commit** — `feat(editor): split selection into lines, add cursor above/below, skip occurrence`
 
 ---
 
