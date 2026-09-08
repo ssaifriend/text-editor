@@ -6,6 +6,8 @@ export type MoruTestHooks = {
   setCursor(pos: number): void
   setWhitespace(on: boolean): void
   path(): string | null
+  meta(): unknown
+  saveAs(mode: 'normal' | 'overwrite'): Promise<void>
 }
 
 export type MoruMetrics = {

@@ -70,6 +70,16 @@ describe('readTextFile', () => {
     if (result.ok) expect(result.value.readonly).toBe(process.platform !== 'win32')
   })
 
+  it('reads utf16le BOM files without treating their NUL bytes as binary', async () => {
+    const path = join(dir, 'u16.txt')
+    await writeFile(path, iconv.encode('a 한\n', 'utf16le', { addBOM: true }))
+
+    const result = await readTextFile(path)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value).toMatchObject({ text: 'a 한\n', encoding: 'utf16le', bom: true })
+  })
+
   it('rejects binary files', async () => {
     const path = join(dir, 'bin')
     await writeFile(path, Buffer.from([0x00, 0x01, 0x02, 0x41]))

@@ -19,9 +19,6 @@ export const BinaryError = z.object({ kind: z.literal('binary'), message: z.stri
 export const OpenError = z.discriminatedUnion('kind', [IoError, BinaryError, UnexpectedError])
 export type OpenError = z.infer<typeof OpenError>
 
-export const SaveError = OpenError
-export type SaveError = OpenError
-
 export const OpenedFile = z.object({
   path: z.string(),
   text: z.string(),
@@ -40,11 +37,41 @@ export type OpenedFile = z.infer<typeof OpenedFile>
 export const OpenRequest = z.object({ path: z.string(), encoding: EncodingName.optional() })
 export type OpenRequest = z.infer<typeof OpenRequest>
 
-export const SaveRequest = z.object({ path: z.string(), text: z.string() })
+export const SaveRequest = z.object({
+  path: z.string(),
+  text: z.string(),
+  encoding: EncodingName,
+  bom: z.boolean(),
+  eol: Eol,
+  expectedHash: z.string().nullable(),
+  mode: z.enum(['normal', 'overwrite']),
+})
 export type SaveRequest = z.infer<typeof SaveRequest>
 
-export const SavedMeta = z.object({ path: z.string(), bytes: z.number().int().nonnegative() })
+export const SavedMeta = z.object({
+  path: z.string(),
+  bytes: z.number().int().nonnegative(),
+  hash: z.string(),
+  mtimeMs: z.number(),
+})
 export type SavedMeta = z.infer<typeof SavedMeta>
+
+export const ReadonlyError = z.object({ kind: z.literal('readonly'), message: z.string() })
+export const ConflictError = z.object({ kind: z.literal('conflict'), message: z.string(), diskHash: z.string() })
+export const EncodingLossyError = z.object({
+  kind: z.literal('encodingLossy'),
+  message: z.string(),
+  positions: z.array(z.number().int().nonnegative()),
+})
+
+export const SaveError = z.discriminatedUnion('kind', [
+  IoError,
+  ReadonlyError,
+  ConflictError,
+  EncodingLossyError,
+  UnexpectedError,
+])
+export type SaveError = z.infer<typeof SaveError>
 
 export const DialogResult = z.object({ path: z.string().nullable() })
 export type DialogResult = z.infer<typeof DialogResult>

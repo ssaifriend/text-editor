@@ -30,9 +30,10 @@ export const readTextFile = async (
   try {
     const [bytes, info, writable] = await Promise.all([readFile(path), stat(path), isWritable(path)])
 
-    if (looksBinary(bytes)) return err({ kind: 'binary', message: `${path} contains NUL bytes` })
-
     const detected = detectEncoding(bytes)
+    const utf16 = detected.encoding === 'utf16le' || detected.encoding === 'utf16be'
+    if (!utf16 && looksBinary(bytes)) return err({ kind: 'binary', message: `${path} contains NUL bytes` })
+
     const encoding = forcedEncoding ?? detected.encoding
     const bom = forcedEncoding ? detected.bom && forcedEncoding === detected.encoding : detected.bom
     const confidence = forcedEncoding ? 'high' : detected.confidence
