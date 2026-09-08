@@ -49,6 +49,7 @@ export const WindowSnapshot = z.object({
   sidebar: z.object({ open: z.boolean(), expanded: z.array(z.string()) }),
   layout: PaneSnapshot,
   activePath: z.array(z.number().int().nonnegative()),
+  findHistory: z.array(z.string()).optional(),
 })
 export type WindowSnapshot = z.infer<typeof WindowSnapshot>
 

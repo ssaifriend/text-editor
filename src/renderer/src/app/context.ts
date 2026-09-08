@@ -6,6 +6,7 @@ export const whenContext = (ws: Workspace, extra: Record<string, boolean | strin
   return {
     editorFocus: ws.state.editorFocused,
     terminalFocus: ws.state.terminalFocused,
+    findFocus: ws.state.findFocused,
     hasBuffer: ws.activeBuffer() !== null,
     hasTerminal: Object.values(ws.state.terminals).some((t) => t.alive),
     hasSelection: selection ? selection.ranges.some((r) => !r.empty) : false,

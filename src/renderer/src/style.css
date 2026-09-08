@@ -328,3 +328,45 @@ html, body, #root {
 
 .sidebar-menu { position: fixed; z-index: 60; }
 .sidebar-menu .popup { position: static; border-radius: 6px; }
+
+.find-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bar);
+  border-top: 1px solid var(--border);
+  flex: 0 0 auto;
+}
+
+.find-row { display: flex; gap: 6px; align-items: center; }
+
+.find-row input {
+  flex: 1 1 auto;
+  min-width: 120px;
+  font: inherit;
+  padding: 4px 6px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  outline: none;
+}
+
+.find-row input.invalid { border-color: #e06c75; }
+
+.find-toggle {
+  font: inherit;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.find-toggle.on { background: var(--selection); }
+.find-count { min-width: 64px; text-align: right; opacity: 0.8; white-space: nowrap; }
+
+.cm-panels { display: none; }

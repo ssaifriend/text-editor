@@ -4,9 +4,12 @@ import { type CompiledBinding, resolveStroke } from '../keymap/bindings'
 import { type KeyStroke, strokeFromEvent } from '../keymap/keys'
 
 const terminalAllowedPrefixes = ['palette.', 'tab.', 'view.', 'terminal.']
+const findAllowedPrefixes = ['palette.', 'tab.', 'view.', 'find.']
 
 export const allowedInTerminal = (commandId: string): boolean =>
   commandId === 'file.new' || terminalAllowedPrefixes.some((prefix) => commandId.startsWith(prefix))
+
+export const allowedInFind = (commandId: string): boolean => findAllowedPrefixes.some((prefix) => commandId.startsWith(prefix))
 
 export const installKeymap = (
   target: Window,
@@ -32,6 +35,11 @@ export const installKeymap = (
     const resolution = resolveStroke(bindings(), pending, stroke, (when) => evaluateWhen(when, ctx))
 
     if (resolution.kind === 'run' && ctx['terminalFocus'] === true && !allowedInTerminal(resolution.binding.command)) {
+      pending = []
+      return
+    }
+
+    if (resolution.kind === 'run' && ctx['findFocus'] === true && !allowedInFind(resolution.binding.command)) {
       pending = []
       return
     }

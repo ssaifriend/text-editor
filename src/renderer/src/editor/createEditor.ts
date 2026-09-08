@@ -1,7 +1,7 @@
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, indentOnInput } from '@codemirror/language'
-import { highlightSelectionMatches, searchKeymap } from '@codemirror/search'
+import { highlightSelectionMatches } from '@codemirror/search'
 import { EditorState, type Extension } from '@codemirror/state'
 import {
   EditorView,
@@ -12,6 +12,7 @@ import {
   keymap,
   rectangularSelection,
 } from '@codemirror/view'
+import { findExtensions } from '../find/panelExtension'
 import { compositionObserver } from './compositionObserver'
 import { externalChangeAnnotation } from './externalChange'
 
@@ -31,7 +32,8 @@ export const baseExtensions = (language: Extension, hooks: ViewHooks): Extension
   bracketMatching(),
   closeBrackets(),
   highlightSelectionMatches(),
-  keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
+  keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
+  findExtensions,
   compositionObserver,
   language,
   EditorView.updateListener.of((update) => {

@@ -41,6 +41,8 @@ export type MoruTestHooks = {
   windowId(): string
   snapshotNow(): unknown
   scrollTop(): number
+  findHistory(): string[]
+  findState(): { open: boolean; count: number; current: number | null }
 }
 
 declare global {
@@ -131,6 +133,8 @@ export const installTestHooks = (
     projectRoot: () => ws.state.projectRoot,
     windowId: () => ws.state.windowId,
     snapshotNow: () => ws.snapshot(),
+    findHistory: () => [...ws.state.find.history],
+    findState: () => ({ open: ws.state.find.open, count: ws.state.find.count, current: ws.state.find.current }),
     scrollTop: () => view().scrollDOM.scrollTop,
     bannerKind: () => {
       const b = ws.activeBuffer()

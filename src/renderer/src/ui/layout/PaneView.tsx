@@ -2,6 +2,7 @@ import { For, Show } from 'solid-js'
 import type { Workspace } from '../../app/workspace'
 import { Banner } from '../banner/Banner'
 import { EditorHost } from '../editor/EditorHost'
+import { FindPanel } from '../find/FindPanel'
 import { TabStrip } from '../tabs/TabStrip'
 import { TerminalHost } from '../terminal/TerminalHost'
 import { DiffHost } from '../diff/DiffHost'
@@ -45,6 +46,9 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
             theme={themeById(props.ws.settings().theme).editor}
           />
         )}
+      </Show>
+      <Show when={props.ws.state.activePane === props.leaf().id && terminalId() === null && diffTab() === null}>
+        <FindPanel ws={props.ws} />
       </Show>
     </div>
   )

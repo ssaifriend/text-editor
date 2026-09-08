@@ -1,4 +1,5 @@
 import { historyField } from '@codemirror/commands'
+import { closeSearchPanel, findNext, findPrevious, openSearchPanel, replaceAll, replaceNext, selectMatches, setSearchQuery } from '@codemirror/search'
 import { indentUnit } from '@codemirror/language'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
@@ -28,6 +29,9 @@ import { baseExtensions, makeState } from '../editor/createEditor'
 import { cursorPosition, type CursorPosition } from '../editor/cursor'
 import { configExtensions, cssFontFamily, settingsCompartment } from '../editor/editorConfig'
 import { changeSetFromDiff, externalChangeAnnotation } from '../editor/externalChange'
+import { buildQuery, countMatches, currentMatchIndex } from '../find/query'
+import { replaceAllPreserving, replaceNextPreserving } from '../find/replace'
+import { type FindSpec, defaultFindSpec, inSelectionField, setInSelectionRanges } from '../find/state'
 import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
@@ -95,6 +99,17 @@ export type WorkspaceState = {
   terminals: Record<string, TerminalMeta>
   projectRoot: string | null
   windowId: string
+  find: {
+    open: boolean
+    replaceOpen: boolean
+    spec: FindSpec
+    valid: boolean
+    count: number
+    capped: boolean
+    current: number | null
+    history: string[]
+  }
+  findFocused: boolean
   sidebar: { open: boolean; expanded: Record<string, true>; entries: Record<string, TreeEntry[]> }
   activePane: PaneId
   editorFocused: boolean
@@ -154,6 +169,15 @@ export type Workspace = {
   readonly setWindowId: (id: string) => void
   readonly snapshot: () => WindowSnapshot
   readonly restoreSession: (snapshot: WindowSnapshot, dirtyEntries: readonly DirtyEntry[]) => Promise<void>
+  readonly openFind: (withReplace: boolean) => void
+  readonly closeFind: () => void
+  readonly setFindSpec: (patch: Partial<FindSpec>) => void
+  readonly setFindFocus: (focused: boolean) => void
+  readonly findNext: () => void
+  readonly findPrevious: () => void
+  readonly findSelectAll: () => void
+  readonly replaceNext: () => void
+  readonly replaceAll: () => void
   readonly toggleSidebar: () => void
   readonly expandDir: (dir: string) => Promise<void>
   readonly collapseDir: (dir: string) => void
@@ -235,6 +259,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     terminals: {},
     projectRoot: null,
     windowId: 'unknown',
+    find: { open: false, replaceOpen: false, spec: defaultFindSpec, valid: false, count: 0, capped: false, current: null, history: [] },
+    findFocused: false,
     sidebar: { open: true, expanded: {}, entries: {} },
     activePane: firstPane,
     editorFocused: false,
@@ -301,7 +327,10 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     if (!buffer || !paneId) return
 
     if (!external) putBuffer({ ...buffer, state: editorState })
-    if (paneId === state.activePane) setState('cursor', cursorPosition(editorState))
+    if (paneId === state.activePane) {
+      setState('cursor', cursorPosition(editorState))
+      if (state.find.open) refreshFindCount(editorState)
+    }
   }
 
   const setEditorFocus = (paneId: PaneId, focused: boolean): void => {
@@ -972,6 +1001,127 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     )
   }
 
+  const activeQuery = (editorState?: EditorState) => {
+    const view = activeView()
+    const st = editorState ?? view?.state
+    if (!st) return null
+    return buildQuery(state.find.spec, st.field(inSelectionField, false) ?? null)
+  }
+
+  const refreshFindCount = (editorState?: EditorState): void => {
+    const view = activeView()
+    const st = editorState ?? view?.state
+    const q = activeQuery(st)
+    if (!st || !q) return
+    const { count, capped } = countMatches(q, st)
+    setState('find', { valid: q.valid, count, capped, current: currentMatchIndex(q, st) })
+  }
+
+  const applyFindQuery = (): void => {
+    const view = activeView()
+    const q = activeQuery()
+    if (!view || !q) return
+    view.dispatch({ effects: setSearchQuery.of(q) })
+    refreshFindCount(view.state)
+  }
+
+  const captureSelectionRanges = (view: EditorView): void => {
+    const ranges = view.state.selection.ranges.filter((r) => !r.empty).map((r) => ({ from: r.from, to: r.to }))
+    view.dispatch({ effects: setInSelectionRanges.of(ranges.length > 0 ? ranges : null) })
+  }
+
+  const openFind = (withReplace: boolean): void => {
+    const view = activeView()
+    if (!view) return
+    const main = view.state.selection.main
+    const selected = view.state.sliceDoc(main.from, main.to)
+    const seed = !main.empty && !selected.includes('\n') ? selected : state.find.spec.search
+    setState('find', {
+      open: true,
+      replaceOpen: withReplace || state.find.replaceOpen,
+      spec: { ...state.find.spec, search: seed },
+    })
+    if (state.find.spec.inSelection) captureSelectionRanges(view)
+    openSearchPanel(view)
+    applyFindQuery()
+  }
+
+  const closeFind = (): void => {
+    const view = activeView()
+    setState('find', 'open', false)
+    setState('findFocused', false)
+    if (view) {
+      closeSearchPanel(view)
+      view.focus()
+    }
+  }
+
+  const setFindSpec = (patch: Partial<FindSpec>): void => {
+    const view = activeView()
+    if (view && patch.inSelection === true) captureSelectionRanges(view)
+    if (view && patch.inSelection === false) view.dispatch({ effects: setInSelectionRanges.of(null) })
+    setState('find', 'spec', { ...state.find.spec, ...patch })
+    applyFindQuery()
+  }
+
+  const pushFindHistory = (): void => {
+    const term = state.find.spec.search
+    if (term.length === 0) return
+    setState('find', 'history', [term, ...state.find.history.filter((t) => t !== term)].slice(0, 20))
+  }
+
+  const findStep = (delta: 1 | -1): void => {
+    const view = activeView()
+    if (!view) return
+    applyFindQuery()
+    const { count, current } = state.find
+    const atEdge = current !== null && (delta === 1 ? current === count : current === 1)
+    if (!state.find.spec.wrap && atEdge) return
+    if (delta === 1) findNext(view)
+    else findPrevious(view)
+    pushFindHistory()
+    refreshFindCount(view.state)
+  }
+
+  const findSelectAll = (): void => {
+    const view = activeView()
+    if (!view) return
+    applyFindQuery()
+    selectMatches(view)
+    pushFindHistory()
+    closeFind()
+  }
+
+  const replaceNextCmd = (): void => {
+    const view = activeView()
+    const q = activeQuery()
+    if (!view || !q || !q.valid) return
+    if (state.find.spec.preserveCase) {
+      const spec = replaceNextPreserving(view.state, q, true)
+      if (spec) view.dispatch(spec)
+    } else {
+      applyFindQuery()
+      replaceNext(view)
+    }
+    pushFindHistory()
+    refreshFindCount(view.state)
+  }
+
+  const replaceAllCmd = (): void => {
+    const view = activeView()
+    const q = activeQuery()
+    if (!view || !q || !q.valid) return
+    if (state.find.spec.preserveCase) {
+      const spec = replaceAllPreserving(view.state, q, true)
+      if (spec) view.dispatch(spec)
+    } else {
+      applyFindQuery()
+      replaceAll(view)
+    }
+    pushFindHistory()
+    refreshFindCount(view.state)
+  }
+
   const historyLimitChars = 1_000_000
 
   const bufferSnapshot = (buffer: Buffer): BufferTabSnapshot => {
@@ -1029,6 +1179,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     sidebar: { open: state.sidebar.open, expanded: Object.keys(state.sidebar.expanded) },
     layout: paneSnapshot(currentTree),
     activePath: pathToLeaf(currentTree, state.activePane) ?? [],
+    findHistory: [...state.find.history],
   })
 
   const treeFromSnapshot = (snap: PaneSnapshot): { tree: PaneNode; leaves: { id: PaneId; snap: LeafSnapshot }[] } => {
@@ -1109,6 +1260,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     for (const entry of dirtyEntries) await invoke('dirty.clear', entry.id)
 
     setState('sidebar', 'open', snap.sidebar.open)
+    if (snap.findHistory) setState('find', 'history', [...snap.findHistory])
     for (const dir of snap.sidebar.expanded) await expandDir(dir)
 
     const targetLeaf = leafAtPath(currentTree, snap.activePath) ?? leaves(currentTree)[0]
@@ -1182,6 +1334,15 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     setWindowId: (id) => setState('windowId', id),
     snapshot,
     restoreSession,
+    openFind,
+    closeFind,
+    setFindSpec,
+    setFindFocus: (focused) => setState('findFocused', focused),
+    findNext: () => findStep(1),
+    findPrevious: () => findStep(-1),
+    findSelectAll,
+    replaceNext: replaceNextCmd,
+    replaceAll: replaceAllCmd,
     toggleSidebar,
     expandDir,
     collapseDir,
