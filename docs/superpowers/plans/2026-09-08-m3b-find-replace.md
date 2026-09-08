@@ -64,7 +64,7 @@ replaceNextPreserving(state: EditorState, query: SearchQuery): TransactionSpec |
 replaceAllPreserving(state: EditorState, query: SearchQuery): TransactionSpec | null
 ```
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/renderer/findState.test.ts`:
 ```ts
@@ -165,9 +165,9 @@ describe('replace with preserve case', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure** → FAIL.
+- [x] **Step 2: Run to verify failure** → FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/find/state.ts`:
 ```ts
@@ -290,9 +290,9 @@ export const replaceNextPreserving = (state: EditorState, query: SearchQuery, pr
 ```
 `preserveCase` argument defaults true here; callers pass `spec.preserveCase`. The third unit test passes `preserveCase` implicitly true with lowercase sample `a1` → `isLower('a1')` is true → `'1a'` lowercased stays `'1a'` ✓.
 
-- [ ] **Step 4: Run** — unit PASS, typecheck PASS.
+- [x] **Step 4: Run** — unit PASS, typecheck PASS.
 
-- [ ] **Step 5: Commit** — `feat(find): in-selection ranges, query builder, match counting, preserve-case replace`
+- [x] **Step 5: Commit** — `feat(find): in-selection ranges, query builder, match counting, preserve-case replace`
 
 ---
 
@@ -314,7 +314,7 @@ export const replaceNextPreserving = (state: EditorState, query: SearchQuery, pr
 - Session: `WindowSnapshot.findHistory?: string[]` saved/restored.
 - Test ids: `find-panel`, `find-input`, `replace-input`, `find-count`, toggles `find-toggle-regexp|case|word|selection|wrap|preserve`, buttons `find-next`, `find-prev`, `find-replace`, `find-replace-all`, `find-select-all`.
 
-- [ ] **Step 1: Write the failing E2E**
+- [x] **Step 1: Write the failing E2E**
 
 `tests/e2e/find.spec.ts`:
 ```ts
@@ -429,9 +429,9 @@ test('recent queries are kept across restarts', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure** → FAIL.
+- [x] **Step 2: Run to verify failure** → FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/find/panelExtension.ts`:
 ```ts
@@ -492,9 +492,9 @@ Test hooks: `findHistory(): string[]`, `findState(): { open; count; current }`.
 
 Style: `.find-panel { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; background: var(--bar); border-top: 1px solid var(--border); flex: 0 0 auto } .find-row { display: flex; gap: 6px; align-items: center } .find-row input { flex: 1; font: inherit; padding: 4px 6px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 4px } .find-toggle { font: inherit; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); cursor: pointer } .find-toggle.on { background: var(--selection) } .find-count { min-width: 64px; text-align: right; opacity: .8 } .cm-panels { display: none }`.
 
-- [ ] **Step 4: Run** — `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test` → all PASS. Regression watch: dropping `searchKeymap` must not break `Cmd+D` (ours) or the IME multi-cursor test (uses `Mod+d` via our keymap → `editor.selectNextOccurrence`) — verify `ime.spec.ts` still passes.
+- [x] **Step 4: Run** — `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test` → all PASS. Regression watch: dropping `searchKeymap` must not break `Cmd+D` (ours) or the IME multi-cursor test (uses `Mod+d` via our keymap → `editor.selectNextOccurrence`) — verify `ime.spec.ts` still passes.
 
-- [ ] **Step 5: Commit** — `feat(find): buffer find/replace panel with toggles, live count, select-all, preserve-case replace, history`
+- [x] **Step 5: Commit** — `feat(find): buffer find/replace panel with toggles, live count, select-all, preserve-case replace, history`
 
 ---
 
