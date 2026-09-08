@@ -84,7 +84,7 @@ docs/superpowers/reports/m1b-editing-shell.md
 - `languages: readonly Language[]` (all known, plain first)
 - `languageFor(path: string): Language`, `languageById(id: string): Language` (falls back to plain), `extensionOf(path: string): string` (kept from M0), `basenameOf(path: string): string`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/unit/renderer/lang.test.ts`:
 ```ts
@@ -144,12 +144,12 @@ describe('languageById', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm vitest run tests/unit/renderer/lang.test.ts`
 Expected: FAIL (`languages`, `languageById`, `basenameOf`, `plainLanguage` missing; `.py` → not `python`).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/editor/lang.ts`:
 ```ts
@@ -252,12 +252,12 @@ export const languageById = (id: string): Language =>
 export const languageFor = (path: string): Language => languageById(languageIdFor(path))
 ```
 
-- [ ] **Step 4: Run tests and typecheck**
+- [x] **Step 4: Run tests and typecheck**
 
 Run: `pnpm vitest run tests/unit/renderer/lang.test.ts && pnpm typecheck`
 Expected: PASS. `App.tsx` still calls `languageFor(path)` and passes it where an `Extension` is expected — change that call to `languageFor(rest.path).load()` to keep typecheck green (App is rewritten in Task 6 anyway).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml src/renderer/src/editor/lang.ts src/renderer/src/App.tsx tests/unit/renderer/lang.test.ts
@@ -280,7 +280,7 @@ git commit -m "feat(lang): language registry with core languages, filename map, 
 - `isDirty(b): boolean`, `titleOf(b): string` (basename or `untitled`), `withState(b, state): Buffer`, `markSaved(b, meta: FileMeta): Buffer` (savedDoc = current doc), `withLanguage(b, languageId, makeState): Buffer` (rebuilds state keeping doc and selection).
 - `createEditor.ts` now exports `baseExtensions(language: Extension, onUpdate, onFocusChange): Extension`, `makeState(doc: string, language: Extension, extras: Extension): EditorState`, and `createView(parent: HTMLElement, state: EditorState): EditorView`. `Editor`/`createEditor` from M0 are removed (Task 6 rewires the app).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/unit/renderer/buffers.test.ts`:
 ```ts
@@ -342,12 +342,12 @@ describe('buffers', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm vitest run tests/unit/renderer/buffers.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/editor/buffers.ts`:
 ```ts
@@ -448,7 +448,7 @@ export const createView = (parent: HTMLElement, state: EditorState): EditorView 
 
 Note: `hooks.onUpdate` is called for doc/selection/focus changes only, not for every viewport update — the status bar and dirty tracking do not need more.
 
-- [ ] **Step 4: Run tests and typecheck**
+- [x] **Step 4: Run tests and typecheck**
 
 Run: `pnpm vitest run tests/unit/renderer && pnpm typecheck`
 Expected: buffers PASS. Typecheck FAILS in `App.tsx`/`testHooks.ts` (they import the removed `createEditor`/`Editor`). That is expected until Task 6; to keep the tree building, temporarily add to `createEditor.ts`:
@@ -457,7 +457,7 @@ export type Editor = { readonly view: EditorView; readonly setDoc: (text: string
 ```
 and keep the M0 `createEditor` function body below the new exports (it will be deleted in Task 6). Re-run typecheck → PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/src/editor tests/unit/renderer/buffers.test.ts
@@ -492,7 +492,7 @@ resizeSplit(tree, splitId, sizes): PaneNode
 siblingLeaf(tree, paneId, delta: 1 | -1): PaneLeaf     // cyclic in leaves() order
 ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/unit/renderer/paneTree.test.ts`:
 ```ts
@@ -605,12 +605,12 @@ describe('moveTab / lookup / sibling', () => {
 
 The root split created by `splitLeaf` has id `'root'` when the tree root is a leaf being split; nested splits get id `split:<newLeafId>`.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm vitest run tests/unit/renderer/paneTree.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/ui/layout/paneTree.ts`:
 ```ts
@@ -755,12 +755,12 @@ export const siblingLeaf = (tree: PaneNode, paneId: PaneId, delta: 1 | -1): Pane
 
 `mapNode` maps parents before children, so a split replacing a leaf is not re-descended into with the same predicate producing duplicates — the `splitLeaf` predicate matches leaf ids only, and the new split's children are the original leaf (already replaced) and a fresh leaf.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `pnpm vitest run tests/unit/renderer/paneTree.test.ts`
 Expected: PASS (16 tests). If `mapNode` re-descends into the freshly created split and wraps the inner `p1` leaf again, change `mapNode` to only recurse into the *original* children: compute `f(tree)`, and if the result is the same object as `tree` (unchanged) recurse; otherwise return the replaced node without descending.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/src/ui/layout/paneTree.ts tests/unit/renderer/paneTree.test.ts
@@ -781,7 +781,7 @@ git commit -m "feat(layout): pure pane tree operations (tabs, split, close, move
 - `createCommandRegistry(getContext: () => WhenContext)` → `{ register(cmd); registerAll(cmds); get(id): Command | null; list(): readonly Command[]; available(): readonly Command[]; run(id, args?): Promise<boolean> }` — `run` resolves `false` when unknown or `when` is false; re-registering an id replaces the command.
 - `editorCommands: readonly { id: string; title: string; run: (view: EditorView) => boolean }[]` — ids: `editor.toggleComment`, `editor.duplicateLine`, `editor.deleteLine`, `editor.selectLine`, `editor.insertLineAfter`, `editor.insertLineBefore`, `editor.indentMore`, `editor.indentLess`, `editor.selectNextOccurrence`, `editor.selectAllOccurrences`, `editor.undoSelection`, `editor.redoSelection`, `editor.matchingBracket`, `editor.selectParent`, `editor.moveLineUp`, `editor.moveLineDown`, `editor.undo`, `editor.redo`, `editor.selectAll`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/unit/renderer/when.test.ts`:
 ```ts
@@ -882,12 +882,12 @@ describe('editor command table', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm vitest run tests/unit/renderer/when.test.ts tests/unit/renderer/registry.test.ts`
 Expected: FAIL — modules not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/commands/when.ts`:
 ```ts
@@ -1130,12 +1130,12 @@ export const editorCommands: readonly EditorCommandSpec[] = [
 ]
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `pnpm vitest run tests/unit/renderer && pnpm typecheck`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/src/commands src/renderer/src/editor/commands.ts tests/unit/renderer/when.test.ts tests/unit/renderer/registry.test.ts
@@ -1161,7 +1161,7 @@ git commit -m "feat(commands): when-expression evaluator, command registry, edit
 - `findConflicts(bindings): readonly { keys: string; when: string | undefined; commands: readonly string[] }[]`
 - `defaultBindings(platform): readonly Binding[]` — ST3 defaults listed below.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/unit/renderer/keys.test.ts`:
 ```ts
@@ -1313,12 +1313,12 @@ describe('defaultBindings', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm vitest run tests/unit/renderer/keys.test.ts tests/unit/renderer/bindings.test.ts`
 Expected: FAIL — modules not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/keymap/keys.ts`:
 ```ts
@@ -1568,12 +1568,12 @@ export const defaultBindings = (platform: Platform): readonly Binding[] => [
 ]
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `pnpm vitest run tests/unit/renderer && pnpm typecheck`
 Expected: PASS. If `A.groupBy` typing in `findConflicts` fights you, replace the pipe with a plain reduce into `Record<string, CompiledBinding[]>` — the behavior matters, not the combinator.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/src/keymap tests/unit/renderer/keys.test.ts tests/unit/renderer/bindings.test.ts
@@ -1640,7 +1640,7 @@ openPath(path: string): Promise<boolean>
 paletteOpen(): boolean
 ```
 
-- [ ] **Step 1: Write the failing E2E tests**
+- [x] **Step 1: Write the failing E2E tests**
 
 `tests/e2e/tabs.spec.ts`:
 ```ts
@@ -1833,12 +1833,12 @@ Add to `tests/e2e/types.d.ts` `MoruTestHooks`:
   paletteOpen(): boolean
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm build && pnpm exec playwright test tests/e2e/tabs.spec.ts tests/e2e/split.spec.ts tests/e2e/keymap.spec.ts`
 Expected: FAIL (`tabs` hook missing).
 
-- [ ] **Step 3: Main — split `MORU_TEST_OPEN` on `path.delimiter`**
+- [x] **Step 3: Main — split `MORU_TEST_OPEN` on `path.delimiter`**
 
 In `src/main/index.ts` `startupPaths`, replace the `fromEnv` line with:
 ```ts
@@ -1846,7 +1846,7 @@ In `src/main/index.ts` `startupPaths`, replace the `fromEnv` line with:
 ```
 and import `delimiter` from `node:path`.
 
-- [ ] **Step 4: Implement the workspace**
+- [x] **Step 4: Implement the workspace**
 
 `src/renderer/src/app/workspace.ts`:
 ```ts
@@ -2341,7 +2341,7 @@ export const installKeymap = (
 }
 ```
 
-- [ ] **Step 5: Implement the UI components**
+- [x] **Step 5: Implement the UI components**
 
 `src/renderer/src/ui/editor/EditorHost.tsx`:
 ```tsx
@@ -2555,7 +2555,7 @@ export const StatusBar = (props: { ws: Workspace }) => {
 
 `meta()` reads the non-reactive buffer; it re-evaluates because `activeMeta()` reads store fields in the same JSX. To make encoding/eol update after save, the status bar reads `props.ws.state.buffers[...]` (reactive) for the trigger and then the buffer for the values — this is what the two accessors above do.
 
-- [ ] **Step 6: App, test hooks, styles**
+- [x] **Step 6: App, test hooks, styles**
 
 `src/renderer/src/App.tsx`:
 ```tsx
@@ -2812,12 +2812,12 @@ Append to `src/renderer/src/style.css`:
 
 Remove the `.toolbar` rules and the `.editor` rule from M0 if nothing uses them.
 
-- [ ] **Step 7: Run everything**
+- [x] **Step 7: Run everything**
 
 Run: `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test`
 Expected: all PASS, including the updated `file.spec.ts` / `roundtrip.spec.ts` and the M0 IME suite. Likely trip-ups: (a) `EditorHost` effect firing before `registerView` — register first (as written); (b) `focusChanged` reported with `hasFocus` false during `setState` — the workspace treats a blur as `editorFocused: false`, and the tab click handler calls `focusView` right after, which re-focuses; (c) `R.match` with async branches — both branches must return promises.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A src tests
@@ -2836,7 +2836,7 @@ git commit -m "feat(shell): workspace store with buffers, tab groups, split pane
 **Interfaces:**
 - `CommandPalette(props: PaletteProps)` — overlay with `[data-testid="palette"]`, an `<input data-testid="palette-input">`, and a list of `[data-testid="palette-item"]` rows (title + key label). Filters `registry.available()` by fuzzy title match (fzf), ArrowUp/Down move, Enter runs the highlighted command **after** `onClose()`, Escape closes. Opening focuses the input and clears the query.
 
-- [ ] **Step 1: Write the failing E2E**
+- [x] **Step 1: Write the failing E2E**
 
 `tests/e2e/palette.spec.ts`:
 ```ts
@@ -2893,12 +2893,12 @@ test('editor-only commands are hidden while the editor is not focused', async ()
 
 The third test passes because the palette snapshots `registry.available()` at open time, when the editor still has focus.
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm build && pnpm exec playwright test tests/e2e/palette.spec.ts`
 Expected: FAIL (palette not rendered).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/ui/palette/CommandPalette.tsx`:
 ```tsx
@@ -3059,12 +3059,12 @@ Append to `style.css`:
 .palette-keys { opacity: 0.6; }
 ```
 
-- [ ] **Step 4: Run**
+- [x] **Step 4: Run**
 
 Run: `pnpm typecheck && pnpm build && pnpm exec playwright test tests/e2e/palette.spec.ts tests/e2e/keymap.spec.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/src/ui/palette src/renderer/src/style.css tests/e2e/palette.spec.ts
@@ -3085,7 +3085,7 @@ git commit -m "feat(palette): fuzzy command palette with key labels"
 - `installMenu(): void` builds the application menu; every non-role item has `id` = command id and `click` → `pushToAll('command.run', { id })`.
 - Test mode: `dialog.confirmClose` returns `process.env.MORU_TEST_CONFIRM ?? 'dontSave'`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add to `tests/unit/shared/ipc.test.ts`:
 ```ts
@@ -3179,12 +3179,12 @@ test('menu items dispatch commands to the renderer', async () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm vitest run tests/unit/shared/ipc.test.ts; pnpm build && pnpm exec playwright test tests/e2e/close.spec.ts tests/e2e/menu.spec.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/shared/channels.ts` — add `dialogConfirmClose: 'dialog.confirmClose'` and `commandRun: 'command.run'`; add `channels.commandRun` to `pushChannels`.
 
@@ -3296,12 +3296,12 @@ const command = (label: string, id: string, accelerator?: string): MenuItemConst
 
 `src/main/index.ts` — after `registerLogChannel()`: `installMenu()` (import from `./menu`).
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 Run: `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A src tests
@@ -3316,7 +3316,7 @@ git commit -m "feat(shell): native application menu dispatching commands and clo
 - Create: `docs/superpowers/reports/m1b-editing-shell.md`
 - Modify: tick checkboxes in this plan
 
-- [ ] **Step 1: Run `pnpm check`, write the report with actual numbers**
+- [x] **Step 1: Run `pnpm check`, write the report with actual numbers**
 
 ```markdown
 # M1b 편집 셸 보고서
@@ -3348,7 +3348,7 @@ git commit -m "feat(shell): native application menu dispatching commands and clo
 상태바 클릭 메뉴(재해석·EOL·인덴트·Set Syntax) · 배너(충돌/lossy/readonly) · 테마 다크/라이트 · 설정 → Compartment(tabSize·wordWrap·lineNumbers·highlightWhitespace·font) + 핫리로드 구독 · dirty store 디바운스 쓰기 + 시작 시 복원 · 사용자 keymap.json 오버레이 · 탭 드래그.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/superpowers
