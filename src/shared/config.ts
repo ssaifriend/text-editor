@@ -9,6 +9,7 @@ export const EditorSettings = z.object({
   fontSize: z.number().int().min(6).max(72).default(13),
   tabSize: z.number().int().min(1).max(16).default(4),
   insertSpaces: z.boolean().default(true),
+  detectIndent: z.boolean().default(true),
   wordWrap: z.boolean().default(false),
   wordBreak: z.enum(['normal', 'keep-all']).default('normal'),
   rulers: z.array(z.number().int().positive()).default([]),

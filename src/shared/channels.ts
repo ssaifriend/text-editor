@@ -19,6 +19,7 @@ export const channels = {
   dialogConfirmClose: 'dialog.confirmClose',
   configGet: 'config.get',
   keymapGet: 'keymap.get',
+  themesGet: 'themes.get',
   ptySpawn: 'pty.spawn',
   ptyWrite: 'pty.write',
   ptyResize: 'pty.resize',
@@ -32,6 +33,7 @@ export const channels = {
   logWrite: 'log.write',
   configChanged: 'config.changed',
   keymapChanged: 'keymap.changed',
+  themesChanged: 'themes.changed',
   commandRun: 'command.run',
   ptyData: 'pty.data',
   ptyExit: 'pty.exit',
@@ -55,6 +57,7 @@ export const sendChannels: readonly Channel[] = [channels.perfFirstPaint, channe
 export const pushChannels: readonly Channel[] = [
   channels.configChanged,
   channels.keymapChanged,
+  channels.themesChanged,
   channels.commandRun,
   channels.ptyData,
   channels.ptyExit,

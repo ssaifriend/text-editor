@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ReplacePlan, ReplaceReport, SearchBatch, SearchDone, SearchSpec } from './search'
+import { ThemesSnapshot } from './theme'
 import { ConfigSnapshot } from './config'
 import { encodingNames, eolNames } from './encoding'
 import { KeymapSnapshot } from './keymapFile'
@@ -156,6 +157,7 @@ export const contracts = {
   },
   'config.get': { request: z.undefined(), response: ipcResult(ConfigSnapshot, UnexpectedError) },
   'keymap.get': { request: z.undefined(), response: ipcResult(KeymapSnapshot, UnexpectedError) },
+  'themes.get': { request: z.undefined(), response: ipcResult(ThemesSnapshot, UnexpectedError) },
   'pty.spawn': {
     request: z.object({ cwd: z.string().nullable(), cols: z.number().int().positive(), rows: z.number().int().positive() }),
     response: ipcResult(z.object({ id: z.string(), pid: z.number(), cwd: z.string() }), UnexpectedError),
@@ -182,6 +184,7 @@ export type ErrorOf<C extends InvokeChannel> = Extract<ResponseOf<C>, { ok: fals
 export const pushContracts = {
   'config.changed': ConfigSnapshot,
   'keymap.changed': KeymapSnapshot,
+  'themes.changed': ThemesSnapshot,
   'command.run': CommandRun,
   'pty.data': z.object({ id: z.string(), data: z.string() }),
   'pty.exit': z.object({ id: z.string(), exitCode: z.number() }),

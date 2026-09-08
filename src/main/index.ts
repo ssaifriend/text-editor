@@ -9,6 +9,7 @@ import { A, pipe } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
 import type { Bounds, WindowSnapshot } from '@shared/session'
 import { createConfigService, createKeymapService } from './config/service'
+import { createThemesService } from './config/themes'
 import { createIndexService } from './index/service'
 import { createReplaceService } from './search/replace'
 import { createSearchService } from './search/run'
@@ -69,6 +70,7 @@ app.whenReady().then(async () => {
   const userData = app.getPath('userData')
   const config = await createConfigService(userData, (snapshot) => pushToAll('config.changed', snapshot))
   const keymap = await createKeymapService(userData, (snapshot) => pushToAll('keymap.changed', snapshot))
+  const themes = await createThemesService(userData, (snapshot) => pushToAll('themes.changed', snapshot))
   initLogging(userData, config.snapshot().settings.log.level)
   logger.info('app ready', { version: app.getVersion(), electron: process.versions.electron })
 
@@ -119,6 +121,7 @@ app.whenReady().then(async () => {
   registerHandlers({
     config,
     keymap,
+    themes,
     dirty,
     pty: ptyManager,
     watch,

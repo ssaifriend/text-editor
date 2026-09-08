@@ -3,6 +3,7 @@ import type { Extension } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import { tags as t } from '@lezer/highlight'
 import { A, O, pipe } from '@mobily/ts-belt'
+import type { UserTheme } from '@shared/theme'
 
 export type Theme = {
   readonly id: string
@@ -125,9 +126,17 @@ export const themes: readonly Theme[] = [
   }),
 ]
 
+let userThemes: readonly Theme[] = []
+
+export const registerUserThemes = (list: readonly UserTheme[]): void => {
+  userThemes = list.map((t) => build(t.id, t.dark, t.palette))
+}
+
+export const allThemes = (): readonly Theme[] => [...themes, ...userThemes]
+
 export const themeById = (id: string): Theme =>
   pipe(
-    themes,
+    allThemes(),
     A.find((th) => th.id === id),
     O.getWithDefault(themes[0] as Theme),
   )

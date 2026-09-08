@@ -16,7 +16,7 @@ import { defaultBindings } from './keymap/defaults'
 import type { Platform } from './keymap/keys'
 import { installTestHooks } from './testHooks'
 import { applyTheme } from './theme/apply'
-import { themeById } from './theme/themes'
+import { registerUserThemes, themeById } from './theme/themes'
 import { PaneView } from './ui/layout/PaneView'
 import { Sidebar } from './ui/sidebar/Sidebar'
 import { Palette, type PaletteMode } from './ui/palette/Palette'
@@ -100,6 +100,16 @@ export const App = () => {
       test: false,
     })
     if (boot.test) installTestHooks(ws, registry, paletteMode, ready, bindings)
+
+    const userThemes = await invoke('themes.get', undefined)
+    R.tap(userThemes, (snapshot) => registerUserThemes(snapshot.themes))
+    onCleanup(
+      on('themes.changed', (snapshot) => {
+        registerUserThemes(snapshot.themes)
+        applyTheme(themeById(settingsStore.settings().theme))
+        ws.applySettings(settingsStore.settings())
+      }),
+    )
 
     await settingsStore.load()
     applyEditorFont(settingsStore.settings().editor)

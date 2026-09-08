@@ -5,6 +5,7 @@ import { CloseChoice, PtyAck } from '@shared/ipc'
 import { WindowSnapshot } from '@shared/session'
 import { ok } from '@shared/result'
 import type { ConfigService, KeymapService } from '../config/service'
+import type { ThemesService } from '../config/themes'
 import { createFile, renamePath, trashPath } from '../fs/ops'
 import { readTextFile } from '../fs/read'
 import { listDirectory } from '../fs/tree'
@@ -26,6 +27,7 @@ const isTest = process.env['MORU_TEST'] === '1'
 export type HandlerDeps = {
   readonly config: ConfigService
   readonly keymap: KeymapService
+  readonly themes: ThemesService
   readonly dirty: DirtyStore
   readonly pty: PtyManager
   readonly watch: WatchService
@@ -42,6 +44,7 @@ export type HandlerDeps = {
 export const registerHandlers = ({
   config,
   keymap,
+  themes,
   dirty,
   pty,
   watch,
@@ -167,6 +170,8 @@ export const registerHandlers = ({
   handle('config.get', async () => ok(config.snapshot()))
 
   handle('keymap.get', async () => ok(keymap.snapshot()))
+
+  handle('themes.get', async () => ok(themes.snapshot()))
 
   handle('dirty.write', async (entry) => {
     await dirty.write(entry)

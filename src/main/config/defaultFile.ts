@@ -5,6 +5,7 @@ export const defaultFileText = `{
     "fontSize": 13,
     "tabSize": 4,
     "insertSpaces": true,
+    "detectIndent": true,
     "wordWrap": false,
     // "keep-all" keeps Korean words unbroken at line ends
     "wordBreak": "normal",

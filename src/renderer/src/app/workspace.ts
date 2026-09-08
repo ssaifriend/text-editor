@@ -36,6 +36,8 @@ import { type FindSpec, defaultFindSpec, inSelectionField, setInSelectionRanges 
 import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
+import { type Indent, detectIndent } from '../editor/indentDetect'
+import { saveChanges } from '../editor/saveTransforms'
 import { markdownExtensions } from '../markdown/extension'
 import { exportName, wrapDocument } from '../markdown/exportHtml'
 import { createRenderer } from '../markdown/render'
@@ -389,15 +391,16 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     else if (state.activePane === paneId) setState('terminalFocused', false)
   }
 
-  const extensionsFor = (languageId: string): Extension => [
+  const extensionsFor = (languageId: string, indent: Indent | null = null): Extension => [
     baseExtensions(languageById(languageId).load(), { onUpdate }),
     languageId === 'markdown' ? markdownExtensions({ linkOnPaste: () => settings().markdown.linkOnPaste }) : [],
-    indentOverride.of([]),
+    indentOverride.of(indent ? indentExtension(indent.tabSize, indent.insertSpaces) : []),
     settingsCompartment.of(configExtensions(resolveForLanguage(settings(), languageId))),
     themeCompartment.of(themeById(settings().theme).editor),
   ]
 
-  const stateFor = (doc: string, languageId: string): EditorState => makeState(doc, extensionsFor(languageId))
+  const stateFor = (doc: string, languageId: string): EditorState =>
+    makeState(doc, extensionsFor(languageId, settings().editor.detectIndent ? detectIndent(doc) : null))
 
   const untitledFormat = (): Format => ({
     encoding: settings().files.defaultEncoding,
@@ -574,7 +577,20 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     )
   }
 
-  const saveBuffer = async (buffer: Buffer, mode: SaveMode, path: string): Promise<boolean> => {
+  const normalizeForSave = (target: Buffer): Buffer => {
+    const changes = saveChanges(target.state, settings().files)
+    if (changes.length === 0) return target
+    const view = viewShowing(target.id)
+    if (view) {
+      view.dispatch({ changes, userEvent: 'save.normalize' })
+      return { ...target, state: view.state }
+    }
+    return { ...target, state: target.state.update({ changes }).state }
+  }
+
+  const saveBuffer = async (original: Buffer, mode: SaveMode, path: string): Promise<boolean> => {
+    const buffer = normalizeForSave(original)
+    if (buffer !== original) putBuffer(buffer)
     const { encoding, bom, eol } = buffer.format
 
     const result = await invoke('fs.save', {
@@ -1348,7 +1364,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       selection: { ranges: [{ anchor: clamp(snap.selection.anchor), head: clamp(snap.selection.head) }], main: 0 },
       ...(useHistory ? { history: snap.history } : {}),
     }
-    return EditorState.fromJSON(json, { extensions: extensionsFor(languageId) }, useHistory ? { history: historyField } : {})
+    const indent = settings().editor.detectIndent ? detectIndent(text) : null
+    return EditorState.fromJSON(json, { extensions: extensionsFor(languageId, indent) }, useHistory ? { history: historyField } : {})
   }
 
   const restoreBufferTab = async (snap: BufferTabSnapshot, dirty: DirtyEntry | undefined): Promise<void> => {
