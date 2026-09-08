@@ -16,7 +16,7 @@ export const App = () => {
   let editor!: Editor
 
   const openPath = async (target: string): Promise<void> => {
-    const result = await invoke('fs.open', target)
+    const result = await invoke('fs.open', { path: target })
 
     R.match(
       result,

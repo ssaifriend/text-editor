@@ -9,24 +9,45 @@ describe('ipc contracts', () => {
     expect(contractChannels).toEqual(invokeChannels)
   })
 
-  it('fs.open response accepts ok and error shapes', () => {
+  it('fs.open request is an object with path and optional encoding', () => {
+    const schema = contracts['fs.open'].request
+    expect(schema.safeParse({ path: '/a.ts' }).success).toBe(true)
+    expect(schema.safeParse({ path: '/a.ts', encoding: 'cp949' }).success).toBe(true)
+    expect(schema.safeParse('/a.ts').success).toBe(false)
+  })
+
+  it('fs.open response accepts the full OpenedFile and every error kind', () => {
     const schema = contracts['fs.open'].response
-    expect(schema.safeParse({ ok: true, value: { path: '/a.ts', text: 'x' } }).success).toBe(true)
+    const file = {
+      path: '/a.ts', text: 'x', encoding: 'utf8', bom: false, eol: 'lf', mixedEol: false,
+      confidence: 'high', hash: 'abc', mtimeMs: 1, readonly: false, largeFile: false,
+    }
+    expect(schema.safeParse({ ok: true, value: file }).success).toBe(true)
     expect(schema.safeParse({ ok: false, error: { kind: 'io', message: 'ENOENT' } }).success).toBe(true)
+    expect(schema.safeParse({ ok: false, error: { kind: 'binary', message: 'NUL' } }).success).toBe(true)
     expect(schema.safeParse({ ok: false, error: { kind: 'unexpected', message: 'bug' } }).success).toBe(true)
   })
 
   it('fs.open response rejects malformed payloads', () => {
     const schema = contracts['fs.open'].response
-    expect(schema.safeParse({ ok: true, value: { path: '/a.ts' } }).success).toBe(false)
+    expect(schema.safeParse({ ok: true, value: { path: '/a.ts', text: 'x' } }).success).toBe(false)
     expect(schema.safeParse({ ok: false, error: { kind: 'weird' } }).success).toBe(false)
-    expect(schema.safeParse({ value: 'no ok flag' }).success).toBe(false)
   })
 
-  it('fs.save request requires path and text', () => {
+  it('fs.save request carries encoding, eol, hash and mode', () => {
     const schema = contracts['fs.save'].request
-    expect(schema.safeParse({ path: '/a.ts', text: '' }).success).toBe(true)
-    expect(schema.safeParse({ path: '/a.ts' }).success).toBe(false)
+    const good = { path: '/a.ts', text: '', encoding: 'utf8', bom: false, eol: 'lf', expectedHash: null, mode: 'normal' }
+    expect(schema.safeParse(good).success).toBe(true)
+    expect(schema.safeParse({ ...good, expectedHash: 'abc', mode: 'overwrite' }).success).toBe(true)
+    expect(schema.safeParse({ path: '/a.ts', text: '' }).success).toBe(false)
+  })
+
+  it('fs.save response accepts conflict and encodingLossy errors', () => {
+    const schema = contracts['fs.save'].response
+    expect(schema.safeParse({ ok: true, value: { path: '/a', bytes: 1, hash: 'h', mtimeMs: 1 } }).success).toBe(true)
+    expect(schema.safeParse({ ok: false, error: { kind: 'conflict', message: 'changed', diskHash: 'h2' } }).success).toBe(true)
+    expect(schema.safeParse({ ok: false, error: { kind: 'encodingLossy', message: 'x', positions: [1, 2] } }).success).toBe(true)
+    expect(schema.safeParse({ ok: false, error: { kind: 'readonly', message: 'x' } }).success).toBe(true)
   })
 
   it('app.bootstrap response carries nullable path and test flag', () => {

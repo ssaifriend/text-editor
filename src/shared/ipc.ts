@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { encodingNames, eolNames } from './encoding'
 
 const ipcResult = <T extends z.ZodType, E extends z.ZodType>(value: T, error: E) =>
   z.discriminatedUnion('ok', [
@@ -9,14 +10,35 @@ const ipcResult = <T extends z.ZodType, E extends z.ZodType>(value: T, error: E)
 export const IoError = z.object({ kind: z.literal('io'), message: z.string() })
 export const UnexpectedError = z.object({ kind: z.literal('unexpected'), message: z.string() })
 
-export const OpenError = z.discriminatedUnion('kind', [IoError, UnexpectedError])
+export const EncodingName = z.enum(encodingNames)
+export const Eol = z.enum(eolNames)
+export const Confidence = z.enum(['high', 'low'])
+
+export const BinaryError = z.object({ kind: z.literal('binary'), message: z.string() })
+
+export const OpenError = z.discriminatedUnion('kind', [IoError, BinaryError, UnexpectedError])
 export type OpenError = z.infer<typeof OpenError>
 
 export const SaveError = OpenError
 export type SaveError = OpenError
 
-export const OpenedFile = z.object({ path: z.string(), text: z.string() })
+export const OpenedFile = z.object({
+  path: z.string(),
+  text: z.string(),
+  encoding: EncodingName,
+  bom: z.boolean(),
+  eol: Eol,
+  mixedEol: z.boolean(),
+  confidence: Confidence,
+  hash: z.string(),
+  mtimeMs: z.number(),
+  readonly: z.boolean(),
+  largeFile: z.boolean(),
+})
 export type OpenedFile = z.infer<typeof OpenedFile>
+
+export const OpenRequest = z.object({ path: z.string(), encoding: EncodingName.optional() })
+export type OpenRequest = z.infer<typeof OpenRequest>
 
 export const SaveRequest = z.object({ path: z.string(), text: z.string() })
 export type SaveRequest = z.infer<typeof SaveRequest>
@@ -32,7 +54,7 @@ export type Bootstrap = z.infer<typeof Bootstrap>
 
 export const contracts = {
   'app.bootstrap': { request: z.undefined(), response: ipcResult(Bootstrap, UnexpectedError) },
-  'fs.open': { request: z.string(), response: ipcResult(OpenedFile, OpenError) },
+  'fs.open': { request: OpenRequest, response: ipcResult(OpenedFile, OpenError) },
   'fs.save': { request: SaveRequest, response: ipcResult(SavedMeta, SaveError) },
   'dialog.openFile': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.saveFile': { request: z.string().nullable(), response: ipcResult(DialogResult, UnexpectedError) },

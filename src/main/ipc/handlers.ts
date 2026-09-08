@@ -9,7 +9,7 @@ const isTest = process.env['MORU_TEST'] === '1'
 export const registerHandlers = (): void => {
   handle('app.bootstrap', async () => ok({ path: process.env['MORU_TEST_OPEN'] ?? null, test: isTest }))
 
-  handle('fs.open', readTextFile)
+  handle('fs.open', ({ path, encoding }) => readTextFile(path, encoding))
 
   handle('fs.save', writeTextFile)
 
