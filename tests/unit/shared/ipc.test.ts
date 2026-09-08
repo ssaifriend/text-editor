@@ -54,9 +54,10 @@ describe('ipc contracts', () => {
     expect(schema.safeParse({ ok: false, error: { kind: 'readonly', message: 'x' } }).success).toBe(true)
   })
 
-  it('app.bootstrap response carries nullable path and test flag', () => {
+  it('app.bootstrap response carries paths and test flag', () => {
     const schema = contracts['app.bootstrap'].response
-    expect(schema.safeParse({ ok: true, value: { path: null, test: true } }).success).toBe(true)
-    expect(schema.safeParse({ ok: true, value: { path: '/x.md', test: false } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { paths: [], test: true } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], test: false } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { path: null, test: true } }).success).toBe(false)
   })
 })

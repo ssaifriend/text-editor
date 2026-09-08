@@ -8,10 +8,14 @@ import { handle } from './register'
 
 const isTest = process.env['MORU_TEST'] === '1'
 
-export type HandlerDeps = { readonly config: ConfigService; readonly dirty: DirtyStore }
+export type HandlerDeps = {
+  readonly config: ConfigService
+  readonly dirty: DirtyStore
+  readonly startupPaths: readonly string[]
+}
 
-export const registerHandlers = ({ config, dirty }: HandlerDeps): void => {
-  handle('app.bootstrap', async () => ok({ path: process.env['MORU_TEST_OPEN'] ?? null, test: isTest }))
+export const registerHandlers = ({ config, dirty, startupPaths }: HandlerDeps): void => {
+  handle('app.bootstrap', async () => ok({ paths: [...startupPaths], test: isTest }))
 
   handle('fs.open', ({ path, encoding }) => readTextFile(path, encoding))
 

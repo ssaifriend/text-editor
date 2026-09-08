@@ -105,9 +105,10 @@ export const App = () => {
     requestAnimationFrame(() => window.moru.send(channels.perfFirstPaint, undefined))
 
     const bootstrap = await invoke('app.bootstrap', undefined)
-    R.tap(bootstrap, ({ path: initial, test }) => {
+    R.tap(bootstrap, ({ paths, test }) => {
       if (test) installTestHooks(editor, { path: () => meta()?.path ?? null, meta, save })
-      if (initial) void openPath(initial)
+      const last = paths.at(-1)
+      if (last) void openPath(last)
     })
   })
 

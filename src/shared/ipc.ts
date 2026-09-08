@@ -85,7 +85,7 @@ export const DirtyEntry = z.object({
 })
 export type DirtyEntry = z.infer<typeof DirtyEntry>
 
-export const Bootstrap = z.object({ path: z.string().nullable(), test: z.boolean() })
+export const Bootstrap = z.object({ paths: z.array(z.string()), test: z.boolean() })
 export type Bootstrap = z.infer<typeof Bootstrap>
 
 export const contracts = {
