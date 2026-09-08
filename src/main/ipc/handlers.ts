@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { dialog, ipcMain } from 'electron'
 import { channels } from '@shared/channels'
 import { CloseChoice, PtyAck } from '@shared/ipc'
+import { WindowSnapshot } from '@shared/session'
 import { ok } from '@shared/result'
 import type { ConfigService, KeymapService } from '../config/service'
 import { createFile, renamePath, trashPath } from '../fs/ops'
@@ -10,6 +11,7 @@ import { listDirectory } from '../fs/tree'
 import { writeTextFile } from '../fs/write'
 import type { PtyManager } from '../pty/manager'
 import type { DirtyStore } from '../session/dirtyStore'
+import type { SessionStore } from '../session/sessionStore'
 import type { ExpectedWrites } from '../watch/expected'
 import type { WatchService } from '../watch/service'
 import type { WindowRegistry } from '../windows'
@@ -27,6 +29,7 @@ export type HandlerDeps = {
   readonly home: string
   readonly windows: WindowRegistry
   readonly openWindow: (projectRoot: string | null) => void
+  readonly session: SessionStore
 }
 
 export const registerHandlers = ({
@@ -39,6 +42,7 @@ export const registerHandlers = ({
   home,
   windows,
   openWindow,
+  session,
 }: HandlerDeps): void => {
   handle('app.bootstrap', async (_request, { sender }) => {
     const info = windows.bySender(sender)
@@ -46,8 +50,18 @@ export const registerHandlers = ({
       paths: [...(info?.startupPaths ?? [])],
       projectRoot: info?.projectRoot ?? null,
       windowId: info?.windowId ?? 'unknown',
+      session: info?.session ?? null,
       test: isTest,
     })
+  })
+
+  handle('session.load', async () => ok({ session: await session.load() }))
+
+  ipcMain.on(channels.sessionSave, (event, raw: unknown) => {
+    const parsed = WindowSnapshot.safeParse(raw)
+    const info = windows.bySender(event.sender)
+    if (!parsed.success || !info) return
+    session.update(info.windowId, parsed.data, info.window.isDestroyed() ? null : info.window.getBounds())
   })
 
   handle('window.new', async (_request, { sender }) => {

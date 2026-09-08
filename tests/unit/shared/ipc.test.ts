@@ -82,8 +82,8 @@ describe('ipc contracts', () => {
 
   it('app.bootstrap response carries paths and test flag', () => {
     const schema = contracts['app.bootstrap'].response
-    expect(schema.safeParse({ ok: true, value: { paths: [], projectRoot: null, windowId: 'w1', test: true } }).success).toBe(true)
-    expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], projectRoot: '/x', windowId: 'w1', test: false } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { paths: [], projectRoot: null, windowId: 'w1', session: null, test: true } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], projectRoot: '/x', windowId: 'w1', session: null, test: false } }).success).toBe(true)
     expect(schema.safeParse({ ok: true, value: { paths: [], test: true } }).success).toBe(false)
   })
 })

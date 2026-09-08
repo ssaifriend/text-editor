@@ -10,6 +10,8 @@ export const channels = {
   fsDelete: 'fs.delete',
   dialogOpenFolder: 'dialog.openFolder',
   windowNew: 'window.new',
+  sessionLoad: 'session.load',
+  sessionSave: 'session.save',
   dialogOpenFile: 'dialog.openFile',
   dialogSaveFile: 'dialog.saveFile',
   dialogConfirmClose: 'dialog.confirmClose',
@@ -37,7 +39,7 @@ export const channels = {
 
 export type Channel = (typeof channels)[keyof typeof channels]
 
-export const sendChannels: readonly Channel[] = [channels.perfFirstPaint, channels.logWrite, channels.ptyAck]
+export const sendChannels: readonly Channel[] = [channels.perfFirstPaint, channels.logWrite, channels.ptyAck, channels.sessionSave]
 
 export const pushChannels: readonly Channel[] = [
   channels.configChanged,

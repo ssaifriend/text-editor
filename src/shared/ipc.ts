@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ConfigSnapshot } from './config'
 import { encodingNames, eolNames } from './encoding'
 import { KeymapSnapshot } from './keymapFile'
+import { SessionFile, WindowSnapshot } from './session'
 
 const ipcResult = <T extends z.ZodType, E extends z.ZodType>(value: T, error: E) =>
   z.discriminatedUnion('ok', [
@@ -99,6 +100,7 @@ export const Bootstrap = z.object({
   paths: z.array(z.string()),
   projectRoot: z.string().nullable(),
   windowId: z.string(),
+  session: WindowSnapshot.nullable(),
   test: z.boolean(),
 })
 export type Bootstrap = z.infer<typeof Bootstrap>
@@ -115,6 +117,10 @@ export const contracts = {
   'fs.delete': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), OpenError) },
   'dialog.openFolder': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'window.new': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
+  'session.load': {
+    request: z.undefined(),
+    response: ipcResult(z.object({ session: SessionFile.nullable() }), UnexpectedError),
+  },
   'dialog.openFile': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.saveFile': { request: z.string().nullable(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.confirmClose': {
