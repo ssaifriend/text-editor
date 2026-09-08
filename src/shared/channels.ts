@@ -44,6 +44,8 @@ export const channels = {
   searchUndoLast: 'search.undoLast',
   searchBatch: 'search.batch',
   searchDone: 'search.done',
+  exportHtml: 'export.html',
+  exportPdf: 'export.pdf',
 } as const
 
 export type Channel = (typeof channels)[keyof typeof channels]

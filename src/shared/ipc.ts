@@ -136,6 +136,14 @@ export const contracts = {
   'search.cancel': { request: z.object({ id: z.string() }), response: ipcResult(z.literal(true), UnexpectedError) },
   'search.replace': { request: ReplacePlan, response: ipcResult(ReplaceReport, UnexpectedError) },
   'search.undoLast': { request: z.undefined(), response: ipcResult(z.object({ report: ReplaceReport.nullable() }), UnexpectedError) },
+  'export.html': {
+    request: z.object({ html: z.string(), suggestedName: z.string() }),
+    response: ipcResult(z.object({ path: z.string().nullable() }), UnexpectedError),
+  },
+  'export.pdf': {
+    request: z.object({ html: z.string(), suggestedName: z.string() }),
+    response: ipcResult(z.object({ path: z.string().nullable() }), UnexpectedError),
+  },
   'session.load': {
     request: z.undefined(),
     response: ipcResult(z.object({ session: SessionFile.nullable() }), UnexpectedError),

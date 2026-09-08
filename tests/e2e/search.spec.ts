@@ -50,9 +50,14 @@ test('replace all edits open buffers without saving, rewrites closed files, and 
   await page.getByTestId('search-replace').fill('bar')
   await page.getByTestId('search-replace').press('Enter')
   await expect(status(page)).toHaveText('5 matches in 2 files')
-  await expect(page.locator('[data-testid="search-match"] ins').first()).toHaveText('bar')
+  await expect(page.locator('[data-testid="search-match"] ins').filter({ hasText: /^Bar$/ })).toHaveCount(1)
+  await expect(page.locator('[data-testid="search-match"] ins').filter({ hasText: /^bar$/ })).toHaveCount(4)
 
-  await page.getByTestId('search-match-toggle').nth(3).click()
+  await page
+    .getByTestId('search-match')
+    .filter({ has: page.locator('del', { hasText: /^Foo$/ }) })
+    .getByTestId('search-match-toggle')
+    .click()
   await page.getByTestId('search-replace-all').click()
 
   await expect.poll(() => readFileSync(join(root, 'src', 'b.ts'), 'utf8')).toBe('export const Foo = "bar"\n')

@@ -17,6 +17,7 @@ export const TabStrip = (props: Props) => (
           const t = tab()
           if (t?.kind === 'terminal') return props.ws.state.terminals[t.ptyId]?.title ?? 'Terminal'
           if (t?.kind === 'diff') return t.title
+          if (t?.kind === 'preview') return `Preview: ${props.ws.state.buffers[t.bufferId]?.title ?? ''}`
           if (t?.kind === 'search') {
             const pattern = props.ws.state.searches[t.searchId]?.spec.pattern ?? ''
             return pattern ? `Find: ${pattern}` : 'Find in Files'

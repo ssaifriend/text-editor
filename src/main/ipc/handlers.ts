@@ -8,6 +8,7 @@ import type { ConfigService, KeymapService } from '../config/service'
 import { createFile, renamePath, trashPath } from '../fs/ops'
 import { readTextFile } from '../fs/read'
 import { listDirectory } from '../fs/tree'
+import { writeHtml, writePdf } from '../preview/export'
 import type { IndexService } from '../index/service'
 import type { ReplaceService } from '../search/replace'
 import type { SearchService } from '../search/run'
@@ -66,7 +67,10 @@ export const registerHandlers = ({
 
   handle('session.load', async () => ok({ session: await session.load() }))
 
-  handle('index.build', async ({ root }) => ok(await index.build(root)))
+  handle('index.build', async ({ root }, { sender }) => {
+    windows.setRoot(sender, root)
+    return ok(await index.build(root))
+  })
 
   handle('index.query', async ({ text, limit }) => ok({ items: await index.query(text, limit) }))
 
@@ -125,9 +129,25 @@ export const registerHandlers = ({
     return ok({ path: canceled ? null : (filePaths[0] ?? null) })
   })
 
-  handle('dialog.saveFile', async (defaultPath) => {
+  const pickSavePath = async (defaultPath: string | null): Promise<string | null> => {
+    const stub = process.env['MORU_TEST_SAVE_PATH']
+    if (isTest && stub) return stub
     const { canceled, filePath } = await dialog.showSaveDialog({ defaultPath: defaultPath ?? undefined })
-    return ok({ path: canceled || !filePath ? null : filePath })
+    return canceled || !filePath ? null : filePath
+  }
+
+  handle('dialog.saveFile', async (defaultPath) => ok({ path: await pickSavePath(defaultPath) }))
+
+  handle('export.html', async ({ html, suggestedName }) => {
+    const path = await pickSavePath(suggestedName)
+    if (path) await writeHtml(path, html)
+    return ok({ path })
+  })
+
+  handle('export.pdf', async ({ html, suggestedName }) => {
+    const path = await pickSavePath(suggestedName)
+    if (path) await writePdf(path, html)
+    return ok({ path })
   })
 
   handle('dialog.confirmClose', async ({ title }) => {

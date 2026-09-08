@@ -21,7 +21,7 @@ type BlockRule = Parameters<Md['block']['ruler']['push']>[1]
 type StateCore = Parameters<CoreRule>[0]
 type StateInline = Parameters<InlineRule>[0]
 type StateBlock = Parameters<BlockRule>[0]
-type Token = StateCore['tokens'][number]
+type RendererRule = NonNullable<Md['renderer']['rules'][string]>
 
 export const toAppFileUrl = (src: string, basePath: string | null, projectRoot: string | null): string | null => {
   if (!basePath || !projectRoot) return null
@@ -118,9 +118,10 @@ export const createRenderer = (): { render: (source: string, opts: RenderOptions
   md.block.ruler.after('fence', 'math_block', mathBlock, { alt: ['paragraph', 'reference', 'blockquote', 'list'] })
 
   const defaultImage = md.renderer.rules['image']!
-  md.renderer.rules['image'] = (tokens: Token[], idx: number, options, env: Env, self) => {
+  const imageRule: RendererRule = (tokens, idx, options, rawEnv, self) => {
+    const env = rawEnv as Env
     const token = tokens[idx]!
-    const src = token.attrGet('src') ?? ''
+    const src = String(token.attrGet('src') ?? '')
     const resolved = resolveImage(src, env)
     if (!resolved) {
       const alt = self.renderInlineAsText(token.children ?? [], options, env)
@@ -129,14 +130,21 @@ export const createRenderer = (): { render: (source: string, opts: RenderOptions
     token.attrSet('src', resolved)
     return defaultImage(tokens, idx, options, env, self)
   }
-  const math = (display: boolean) => (tokens: Token[], idx: number, _options: unknown, env: Env) => {
-    const content = tokens[idx]!.content
-    if (!env.katex) return display ? `<pre class="math">${escapeHtml(content)}</pre>` : `<code class="math">${escapeHtml(content)}</code>`
-    const rendered = env.katex.renderToString(content, { displayMode: display, throwOnError: false })
-    return display ? `<div class="math-block" data-line="${tokens[idx]!.map ? tokens[idx]!.map![0] + 1 : ''}">${rendered}</div>` : rendered
-  }
-  md.renderer.rules['math_inline'] = math(false)
-  md.renderer.rules['math_block'] = math(true)
+  md.renderer.rules['image'] = imageRule
+
+  const mathRule =
+    (display: boolean): RendererRule =>
+    (tokens, idx, _options, rawEnv) => {
+      const env = rawEnv as Env
+      const token = tokens[idx]!
+      const content = token.content
+      if (!env.katex) return display ? `<pre class="math">${escapeHtml(content)}</pre>` : `<code class="math">${escapeHtml(content)}</code>`
+      const rendered = env.katex.renderToString(content, { displayMode: display, throwOnError: false })
+      const line = token.map ? String(token.map[0] + 1) : ''
+      return display ? `<div class="math-block" data-line="${line}">${rendered}</div>` : rendered
+    }
+  md.renderer.rules['math_inline'] = mathRule(false)
+  md.renderer.rules['math_block'] = mathRule(true)
 
   return {
     render: (source, opts) => DOMPurify.sanitize(md.render(source, opts), purifyOptions),

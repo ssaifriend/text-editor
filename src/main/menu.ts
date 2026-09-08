@@ -72,6 +72,16 @@ export const installMenu = (): void => {
       ],
     },
     {
+      label: 'Markdown',
+      submenu: [
+        command('Toggle Preview', 'markdown.togglePreview', 'CmdOrCtrl+Shift+V'),
+        { type: 'separator' },
+        command('Export HTML…', 'markdown.exportHtml'),
+        command('Export PDF…', 'markdown.exportPdf'),
+        command('Copy HTML', 'markdown.copyHtml'),
+      ],
+    },
+    {
       label: 'Goto',
       submenu: [
         command('Goto Anything…', 'palette.goto', 'CmdOrCtrl+P'),

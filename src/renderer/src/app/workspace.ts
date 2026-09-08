@@ -11,7 +11,7 @@ import type { EncodingName, Eol } from '@shared/encoding'
 import { fnv1a32 } from '@shared/hash'
 import type { DirtyEntry, OpenedFile, SaveError, TreeEntry } from '@shared/ipc'
 import type { ReplaceReport, SearchMatch, SearchSpec } from '@shared/search'
-import type { BufferTabSnapshot, LeafSnapshot, PaneSnapshot, SearchTabSnapshot, TabSnapshot, WindowSnapshot } from '@shared/session'
+import type { BufferTabSnapshot, LeafSnapshot, PaneSnapshot, PreviewTabSnapshot, SearchTabSnapshot, TabSnapshot, WindowSnapshot } from '@shared/session'
 import {
   type Buffer,
   type BufferId,
@@ -37,6 +37,8 @@ import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
 import { markdownExtensions } from '../markdown/extension'
+import { exportName, wrapDocument } from '../markdown/exportHtml'
+import { createRenderer } from '../markdown/render'
 import { invoke, on } from '../ipc'
 import { searchState as searchLocal } from '../search/local'
 import {
@@ -77,6 +79,7 @@ export type Tab =
   | { readonly id: TabId; readonly kind: 'terminal'; readonly ptyId: string }
   | { readonly id: TabId; readonly kind: 'diff'; readonly bufferId: BufferId; readonly diskText: string; readonly bufferText: string; readonly title: string }
   | { readonly id: TabId; readonly kind: 'search'; readonly searchId: string }
+  | { readonly id: TabId; readonly kind: 'preview'; readonly bufferId: BufferId }
 
 export type TerminalMeta = {
   readonly id: string
@@ -96,6 +99,7 @@ export type BufferMeta = {
   readonly encoding: EncodingName
   readonly bom: boolean
   readonly eol: Eol
+  readonly docVersion: number
 }
 export type CloseChoice = 'save' | 'dontSave' | 'cancel'
 export type SaveMode = 'normal' | 'overwrite'
@@ -210,6 +214,11 @@ export type Workspace = {
   readonly openMatch: (match: SearchMatch, preview: boolean) => Promise<void>
   readonly searchReplaceAll: (searchId: string) => Promise<{ closed: ReplaceReport; buffers: number }>
   readonly searchUndoReplace: () => Promise<ReplaceReport | null>
+  readonly viewForBuffer: (bufferId: BufferId) => EditorView | null
+  readonly togglePreview: () => void
+  readonly renderMarkdownHtml: (bufferId: BufferId) => string | null
+  readonly exportMarkdown: (bufferId: BufferId | null, kind: 'html' | 'pdf') => Promise<void>
+  readonly copyMarkdownHtml: (bufferId: BufferId | null) => Promise<void>
   readonly toggleSidebar: () => void
   readonly expandDir: (dir: string) => Promise<void>
   readonly collapseDir: (dir: string) => void
@@ -249,6 +258,7 @@ const metaOf = (buffer: Buffer): BufferMeta => ({
   encoding: buffer.format.encoding,
   bom: buffer.format.bom,
   eol: buffer.format.eol,
+  docVersion: 0,
 })
 
 const sameMeta = (a: BufferMeta | undefined, b: BufferMeta): boolean =>
@@ -261,7 +271,8 @@ const sameMeta = (a: BufferMeta | undefined, b: BufferMeta): boolean =>
   a.insertSpaces === b.insertSpaces &&
   a.encoding === b.encoding &&
   a.bom === b.bom &&
-  a.eol === b.eol
+  a.eol === b.eol &&
+  a.docVersion === b.docVersion
 
 const indentOverride = new Compartment()
 
@@ -348,10 +359,10 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
   const putBuffer = (buffer: Buffer): void => {
     const prev = buffers[buffer.id]
     buffers = D.set(buffers, buffer.id, buffer)
-    const next = metaOf(buffer)
+    const docChanged = !prev || !prev.state.doc.eq(buffer.state.doc)
+    const next = { ...metaOf(buffer), docVersion: (state.buffers[buffer.id]?.docVersion ?? 0) + (docChanged ? 1 : 0) }
     if (!sameMeta(state.buffers[buffer.id], next)) setState('buffers', buffer.id, next)
 
-    const docChanged = !prev || !prev.state.doc.eq(buffer.state.doc)
     const dirtyChanged = (prev ? isDirty(prev) : false) !== next.dirty
     if (docChanged || dirtyChanged) dirtySync.changed(dirtyEntry(buffer), next.dirty)
   }
@@ -536,6 +547,19 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       return
     }
 
+    if (tab.kind === 'preview') {
+      setTree(removeTab(currentTree, tabId))
+      setState(
+        produce((s) => {
+          delete s.tabs[tabId]
+        }),
+      )
+      return
+    }
+
+    D.values(state.tabs)
+      .filter((t) => t.kind === 'preview' && t.bufferId === tab.bufferId)
+      .forEach((t) => dropTab(t.id))
     const buffer = buffers[tab.bufferId]
     if (buffer) dirtySync.changed(dirtyEntry(buffer), false)
     if (buffer?.meta) void invoke('fs.unwatch', { path: buffer.meta.path })
@@ -630,7 +654,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       return
     }
 
-    if (tab.kind === 'diff' || tab.kind === 'search') {
+    if (tab.kind === 'diff' || tab.kind === 'search' || tab.kind === 'preview') {
       dropTab(tab.id)
       return
     }
@@ -1268,6 +1292,10 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       const search = state.searches[tab.searchId]
       return search ? { kind: 'search', spec: { ...unwrap(search).spec }, replacement: search.replacement } : null
     }
+    if (tab.kind === 'preview') {
+      const path = buffers[tab.bufferId]?.meta?.path
+      return path ? { kind: 'preview', path } : null
+    }
     return null
   }
 
@@ -1368,7 +1396,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       for (const tabSnap of leaf.snap.tabs) {
         if (tabSnap.kind === 'buffer') await restoreBufferTab(tabSnap, dirtyById[tabSnap.dirtyId])
         else if (tabSnap.kind === 'terminal') await restoreTerminalTab(tabSnap)
-        else restoreSearchTab(tabSnap)
+        else if (tabSnap.kind === 'search') restoreSearchTab(tabSnap)
+        else restorePreviewTab(tabSnap)
       }
       const restoredLeaf = findLeaf(currentTree, leaf.id)
       const activeTab = restoredLeaf && leaf.snap.active !== null ? restoredLeaf.tabs[leaf.snap.active] : undefined
@@ -1542,6 +1571,80 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     return report
   }
 
+  const restorePreviewTab = (snap: PreviewTabSnapshot): void => {
+    const buffer = bufferByPath(snap.path)
+    if (buffer) addTabToActive({ id: nextTabId(), kind: 'preview', bufferId: buffer.id })
+  }
+
+  const previewTabFor = (bufferId: BufferId): Extract<Tab, { kind: 'preview' }> | undefined =>
+    D.values(state.tabs).find((t): t is Extract<Tab, { kind: 'preview' }> => t.kind === 'preview' && t.bufferId === bufferId)
+
+  const markdownTargetOf = (tab: Tab | undefined): BufferId | null => {
+    if (tab?.kind === 'preview') return tab.bufferId
+    if (tab?.kind === 'buffer' && buffers[tab.bufferId]?.languageId === 'markdown') return tab.bufferId
+    return null
+  }
+
+  const togglePreview = (): void => {
+    const leaf = activeLeaf()
+    const bufferId = markdownTargetOf(leaf.active ? state.tabs[leaf.active] : undefined)
+    if (!bufferId) return
+
+    const existing = previewTabFor(bufferId)
+    if (existing) {
+      dropTab(existing.id)
+      return
+    }
+
+    const sourcePane = state.activePane
+    if (leaves(currentTree).length === 1) splitActive('row')
+    const target = leaves(currentTree).find((l) => l.id !== sourcePane) ?? activeLeaf()
+    const tab: Tab = { id: nextTabId(), kind: 'preview', bufferId }
+    setState('tabs', tab.id, tab)
+    setTree(setActiveTab(addTab(currentTree, target.id, tab.id), target.id, tab.id))
+    focusView(sourcePane)
+  }
+
+  const markdownRenderer = createRenderer()
+
+  const renderMarkdownHtml = (bufferId: BufferId): string | null => {
+    const buffer = buffers[bufferId]
+    if (!buffer) return null
+    return markdownRenderer.render(buffer.state.doc.toString(), {
+      basePath: buffer.meta?.path ?? null,
+      projectRoot: state.projectRoot,
+      allowRemoteImages: settings().preview.allowRemoteImages,
+      katex: null,
+    })
+  }
+
+  const resolveMarkdownTarget = (bufferId: BufferId | null): BufferId | null => {
+    if (bufferId) return bufferId
+    const leaf = activeLeaf()
+    return markdownTargetOf(leaf.active ? state.tabs[leaf.active] : undefined)
+  }
+
+  const exportMarkdown = async (bufferId: BufferId | null, kind: 'html' | 'pdf'): Promise<void> => {
+    const target = resolveMarkdownTarget(bufferId)
+    const buffer = target ? buffers[target] : undefined
+    const body = target ? renderMarkdownHtml(target) : null
+    if (!buffer || body === null) return
+
+    const html = wrapDocument(body, titleOf(buffer))
+    const suggestedName = exportName(buffer.meta?.path ?? null, kind)
+    const result = await invoke(kind === 'html' ? 'export.html' : 'export.pdf', { html, suggestedName })
+    const path = R.getWithDefault(result, { path: null }).path
+    setState('status', path ? `exported ${path}` : 'export cancelled')
+  }
+
+  const copyMarkdownHtml = async (bufferId: BufferId | null): Promise<void> => {
+    const target = resolveMarkdownTarget(bufferId)
+    const body = target ? renderMarkdownHtml(target) : null
+    if (body === null) return
+    await navigator.clipboard.writeText(body)
+    setState('status', 'HTML copied')
+  }
+
   const leafAtPath = (node: PaneNode, path: readonly number[]): PaneLeaf | null => {
     if (node.kind === 'leaf') return path.length === 0 ? node : null
     const [head, ...rest] = path
@@ -1633,6 +1736,11 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     openMatch,
     searchReplaceAll,
     searchUndoReplace,
+    viewForBuffer: viewShowing,
+    togglePreview,
+    renderMarkdownHtml,
+    exportMarkdown,
+    copyMarkdownHtml,
     toggleSidebar,
     expandDir,
     collapseDir,

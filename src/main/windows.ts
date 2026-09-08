@@ -16,6 +16,8 @@ export type WindowRegistry = {
   readonly remove: (windowId: string) => void
   readonly bySender: (sender: WebContents) => WindowInfo | null
   readonly all: () => readonly WindowInfo[]
+  readonly setRoot: (sender: WebContents, root: string | null) => void
+  readonly focusedRoot: () => string | null
 }
 
 export const createWindowRegistry = (): WindowRegistry => {
@@ -34,6 +36,15 @@ export const createWindowRegistry = (): WindowRegistry => {
     },
     bySender: (sender) => Object.values(windows).find((w) => w.window.webContents === sender) ?? null,
     all: () => Object.values(windows),
+    setRoot: (sender, root) => {
+      const info = Object.values(windows).find((w) => w.window.webContents === sender)
+      if (info) windows = D.set(windows, info.windowId, { ...info, projectRoot: root })
+    },
+    focusedRoot: () => {
+      const all = Object.values(windows)
+      const focused = all.find((w) => !w.window.isDestroyed() && w.window.isFocused())
+      return (focused ?? all[0])?.projectRoot ?? null
+    },
   }
 }
 

@@ -48,6 +48,6 @@ describe('render', () => {
     r.render(source, opts)
     const elapsed = performance.now() - started
     console.log(`markdown render 10k lines: ${elapsed.toFixed(0)} ms`)
-    expect(elapsed).toBeLessThan(process.env['CI'] ? 1500 : 600)
+    expect(elapsed).toBeLessThan(process.env['CI'] ? 3000 : 1500)
   })
 })

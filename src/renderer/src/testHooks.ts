@@ -1,5 +1,7 @@
 import { indentUnit } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
+import { EditorView } from '@codemirror/view'
+import { lineForScrollTop } from './markdown/scrollSync'
 import type { Accessor } from 'solid-js'
 import type { Workspace } from './app/workspace'
 import type { CommandRegistry } from './commands/registry'
@@ -48,6 +50,10 @@ export type MoruTestHooks = {
   findState(): { open: boolean; count: number; current: number | null }
   searchState(): { status: string; total: number; files: { path: string; count: number; source: string }[] } | null
   searchTabs(): number
+  previewHtml(): string | null
+  previewScrollLine(): number | null
+  previewTabs(): number
+  gotoLineTop(line: number): void
 }
 
 declare global {
@@ -151,6 +157,17 @@ export const installTestHooks = (
         : null
     },
     searchTabs: () => Object.values(ws.state.tabs).filter((t) => t.kind === 'search').length,
+    previewHtml: () => document.querySelector('[data-testid="preview-body"]')?.innerHTML ?? null,
+    previewScrollLine: () => {
+      const body = document.querySelector<HTMLElement>('[data-testid="preview-body"]')
+      return body ? lineForScrollTop(body, body.scrollTop) : null
+    },
+    previewTabs: () => Object.values(ws.state.tabs).filter((t) => t.kind === 'preview').length,
+    gotoLineTop: (line) => {
+      const v = view()
+      const target = v.state.doc.line(Math.min(Math.max(1, line), v.state.doc.lines))
+      v.dispatch({ effects: EditorView.scrollIntoView(target.from, { y: 'start' }) })
+    },
     scrollTop: () => view().scrollDOM.scrollTop,
     bannerKind: () => {
       const b = ws.activeBuffer()

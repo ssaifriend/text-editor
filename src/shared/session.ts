@@ -22,7 +22,10 @@ export type TerminalTabSnapshot = z.infer<typeof TerminalTabSnapshot>
 export const SearchTabSnapshot = z.object({ kind: z.literal('search'), spec: SearchSpec, replacement: z.string() })
 export type SearchTabSnapshot = z.infer<typeof SearchTabSnapshot>
 
-export const TabSnapshot = z.discriminatedUnion('kind', [BufferTabSnapshot, TerminalTabSnapshot, SearchTabSnapshot])
+export const PreviewTabSnapshot = z.object({ kind: z.literal('preview'), path: z.string() })
+export type PreviewTabSnapshot = z.infer<typeof PreviewTabSnapshot>
+
+export const TabSnapshot = z.discriminatedUnion('kind', [BufferTabSnapshot, TerminalTabSnapshot, SearchTabSnapshot, PreviewTabSnapshot])
 export type TabSnapshot = z.infer<typeof TabSnapshot>
 
 export type LeafSnapshot = { kind: 'leaf'; tabs: TabSnapshot[]; active: number | null }

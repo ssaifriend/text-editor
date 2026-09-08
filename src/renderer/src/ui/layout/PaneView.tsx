@@ -7,6 +7,7 @@ import { TabStrip } from '../tabs/TabStrip'
 import { TerminalHost } from '../terminal/TerminalHost'
 import { DiffHost } from '../diff/DiffHost'
 import { SearchHost } from '../search/SearchHost'
+import { PreviewHost } from '../preview/PreviewHost'
 import { themeById } from '../../theme/themes'
 import type { PaneLeaf, PaneNode, PaneSplit } from './paneTree'
 import { SplitGutter } from './SplitGutter'
@@ -30,7 +31,11 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
     const tab = activeTab()
     return tab?.kind === 'search' ? tab : null
   }
-  const editorHidden = () => terminalId() !== null || diffTab() !== null || searchTab() !== null
+  const previewTab = () => {
+    const tab = activeTab()
+    return tab?.kind === 'preview' ? tab : null
+  }
+  const editorHidden = () => terminalId() !== null || diffTab() !== null || searchTab() !== null || previewTab() !== null
 
   return (
     <div
@@ -55,6 +60,9 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
       </Show>
       <Show when={searchTab()} keyed>
         {(tab) => <SearchHost ws={props.ws} searchId={tab.searchId} />}
+      </Show>
+      <Show when={previewTab()} keyed>
+        {(tab) => <PreviewHost ws={props.ws} bufferId={tab.bufferId} />}
       </Show>
       <Show when={props.ws.state.activePane === props.leaf().id && !editorHidden()}>
         <FindPanel ws={props.ws} />

@@ -26,6 +26,7 @@ const common: readonly Binding[] = [
   { keys: 'mod+shift+[', command: 'markdown.headingDown', when: "languageId == 'markdown' && editorFocus" },
   { keys: 'mod+alt+t', command: 'markdown.alignTable', when: "languageId == 'markdown' && editorFocus" },
   { keys: 'mod+alt+r', command: 'markdown.renumberList', when: "languageId == 'markdown' && editorFocus" },
+  { keys: 'mod+shift+v', command: 'markdown.togglePreview' },
   { keys: 'mod+alt+2', command: 'view.splitRight' },
   { keys: 'mod+alt+shift+2', command: 'view.splitDown' },
   { keys: 'mod+alt+1', command: 'view.singlePane' },

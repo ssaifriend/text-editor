@@ -19,6 +19,7 @@ import { installMenu } from './menu'
 import { markDidFinishLoad, markFirstPaint, markReady, metrics } from './perf'
 import { defaultShell, resolveShellEnv } from './pty/env'
 import { createPtyManager } from './pty/manager'
+import { installAppFileProtocol, registerAppFileScheme } from './preview/protocol'
 import { probePty } from './pty/probe'
 import { createDirtyStore } from './session/dirtyStore'
 import { createSessionStore } from './session/sessionStore'
@@ -33,6 +34,7 @@ let quitConfirmed = false
 
 const userDataOverride = process.env['MORU_USER_DATA']
 if (userDataOverride) app.setPath('userData', userDataOverride)
+registerAppFileScheme()
 
 const isExistingFile = (path: string): boolean => existsSync(path) && statSync(path).isFile()
 const isExistingDir = (path: string): boolean => existsSync(path) && statSync(path).isDirectory()
@@ -86,6 +88,7 @@ app.whenReady().then(async () => {
     void index.dispose()
   })
   const windows = createWindowRegistry()
+  installAppFileProtocol({ root: () => windows.focusedRoot(), log: (message) => logger.warn(message) })
   const sessionStore = createSessionStore(userData)
   const index = createIndexService({ rgPath, subscribe: watcher.subscribe, push: pushToAll })
   const search = createSearchService({ rgPath, push: pushToAll, settings: () => config.snapshot().settings.search })
