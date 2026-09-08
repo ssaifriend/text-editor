@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ConfigSnapshot } from './config'
 import { encodingNames, eolNames } from './encoding'
 
 const ipcResult = <T extends z.ZodType, E extends z.ZodType>(value: T, error: E) =>
@@ -76,6 +77,14 @@ export type SaveError = z.infer<typeof SaveError>
 export const DialogResult = z.object({ path: z.string().nullable() })
 export type DialogResult = z.infer<typeof DialogResult>
 
+export const DirtyEntry = z.object({
+  id: z.string().min(1),
+  path: z.string().nullable(),
+  text: z.string(),
+  selection: z.object({ anchor: z.number().int().nonnegative(), head: z.number().int().nonnegative() }),
+})
+export type DirtyEntry = z.infer<typeof DirtyEntry>
+
 export const Bootstrap = z.object({ path: z.string().nullable(), test: z.boolean() })
 export type Bootstrap = z.infer<typeof Bootstrap>
 
@@ -85,10 +94,10 @@ export const contracts = {
   'fs.save': { request: SaveRequest, response: ipcResult(SavedMeta, SaveError) },
   'dialog.openFile': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'dialog.saveFile': { request: z.string().nullable(), response: ipcResult(DialogResult, UnexpectedError) },
-  'config.get': { request: z.undefined(), response: ipcResult(z.unknown(), UnexpectedError) },
-  'dirty.write': { request: z.unknown(), response: ipcResult(z.null(), UnexpectedError) },
-  'dirty.clear': { request: z.string(), response: ipcResult(z.null(), UnexpectedError) },
-  'dirty.list': { request: z.undefined(), response: ipcResult(z.unknown(), UnexpectedError) },
+  'config.get': { request: z.undefined(), response: ipcResult(ConfigSnapshot, UnexpectedError) },
+  'dirty.write': { request: DirtyEntry, response: ipcResult(z.literal(true), UnexpectedError) },
+  'dirty.clear': { request: z.string(), response: ipcResult(z.literal(true), UnexpectedError) },
+  'dirty.list': { request: z.undefined(), response: ipcResult(z.array(DirtyEntry), UnexpectedError) },
 } as const
 
 export type Contracts = typeof contracts
@@ -99,7 +108,7 @@ export type ValueOf<C extends InvokeChannel> = Extract<ResponseOf<C>, { ok: true
 export type ErrorOf<C extends InvokeChannel> = Extract<ResponseOf<C>, { ok: false }>['error']
 
 export const pushContracts = {
-  'config.changed': z.unknown(),
+  'config.changed': ConfigSnapshot,
 } as const
 export type PushChannel = keyof typeof pushContracts
 export type PushPayload<C extends PushChannel> = z.infer<(typeof pushContracts)[C]>

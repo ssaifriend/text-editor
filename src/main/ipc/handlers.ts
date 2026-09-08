@@ -1,12 +1,16 @@
 import { dialog } from 'electron'
 import { ok } from '@shared/result'
+import type { ConfigService } from '../config/service'
 import { readTextFile } from '../fs/read'
 import { writeTextFile } from '../fs/write'
+import type { DirtyStore } from '../session/dirtyStore'
 import { handle } from './register'
 
 const isTest = process.env['MORU_TEST'] === '1'
 
-export const registerHandlers = (): void => {
+export type HandlerDeps = { readonly config: ConfigService; readonly dirty: DirtyStore }
+
+export const registerHandlers = ({ config, dirty }: HandlerDeps): void => {
   handle('app.bootstrap', async () => ok({ path: process.env['MORU_TEST_OPEN'] ?? null, test: isTest }))
 
   handle('fs.open', ({ path, encoding }) => readTextFile(path, encoding))
@@ -22,4 +26,18 @@ export const registerHandlers = (): void => {
     const { canceled, filePath } = await dialog.showSaveDialog({ defaultPath: defaultPath ?? undefined })
     return ok({ path: canceled || !filePath ? null : filePath })
   })
+
+  handle('config.get', async () => ok(config.snapshot()))
+
+  handle('dirty.write', async (entry) => {
+    await dirty.write(entry)
+    return ok(true as const)
+  })
+
+  handle('dirty.clear', async (id) => {
+    await dirty.clear(id)
+    return ok(true as const)
+  })
+
+  handle('dirty.list', async () => ok(await dirty.list()))
 }

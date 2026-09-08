@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { R } from '@mobily/ts-belt'
 import { invoke, on } from '@renderer/ipc'
+import { defaultSettings } from '@shared/config'
 
 const bridge = { invoke: vi.fn(), send: vi.fn() }
 
@@ -55,9 +56,11 @@ describe('renderer on', () => {
 
     const handler = vi.fn()
     on('config.changed', handler)
-    listeners[0]!({ anything: true })
+    listeners[0]!({ settings: defaultSettings, error: null })
+    listeners[0]!({ malformed: true })
 
     expect(bridgeOn).toHaveBeenCalledWith('config.changed', expect.any(Function))
-    expect(handler).toHaveBeenCalledWith({ anything: true })
+    expect(handler).toHaveBeenCalledTimes(1)
+    expect(handler).toHaveBeenCalledWith({ settings: defaultSettings, error: null })
   })
 })
