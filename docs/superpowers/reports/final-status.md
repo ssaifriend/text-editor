@@ -15,7 +15,7 @@
 ## 최종 검증
 
 - 로컬(macOS arm64): `pnpm check` = typecheck 0 에러 · 유닛 266/266 · E2E 80/80.
-- CI(GitHub Actions, push마다 macOS + Windows): macOS 그린. Windows는 첫 실행 15개 실패 → 8.3 경로·`:` 파일명·구분자·플랫폼 키 문제를 고쳐 마지막 확인 시점에 1개(export 파일 쓰기 경합, 테스트 측 수정 완료)만 남음. 다음 push에서 그린 예상.
+- CI(GitHub Actions, push마다 macOS + Windows): **양 OS 그린** (`c6f9376`, run 34222481908). Windows는 첫 실행 15개 실패 → `:` 파일명(dirty store)·watcher 경로 키·설정 핫리로드 폴링·CRLF 픽스처·플랫폼 키·결과 순서 의존 테스트를 고쳐 그린. GPU 없는 러너에서 타이핑 지연은 기록만 하고 단언하지 않음(`m6-transition.md`).
 - 성능 예산 5개 전부 통과(수치는 `m6-transition.md`).
 
 ## 사용자 몫
