@@ -4,6 +4,7 @@ import { EncodingName, Eol } from '@shared/ipc'
 import type { CommandRegistry } from '../commands/registry'
 import { type CompiledBinding, findConflicts } from '../keymap/bindings'
 import { editorCommands } from '../editor/commands'
+import { markdownCommands } from '../markdown/commands'
 import { invoke } from '../ipc'
 import type { Workspace } from './workspace'
 
@@ -174,6 +175,15 @@ export const registerAppCommands = (registry: CommandRegistry, ws: Workspace, ui
       id: spec.id,
       title: `Edit: ${spec.title}`,
       when: 'editorFocus',
+      run: () => {
+        const view = ws.activeView()
+        if (view) spec.run(view)
+      },
+    })),
+    ...markdownCommands.map((spec) => ({
+      id: spec.id,
+      title: spec.title,
+      when: "languageId == 'markdown'",
       run: () => {
         const view = ws.activeView()
         if (view) spec.run(view)

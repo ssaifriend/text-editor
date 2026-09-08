@@ -35,10 +35,21 @@ export const SearchSettings = z.object({
 })
 export type SearchSettings = z.infer<typeof SearchSettings>
 
+export const MarkdownSettings = z.object({
+  katex: z.boolean().default(false),
+  linkOnPaste: z.boolean().default(true),
+})
+export type MarkdownSettings = z.infer<typeof MarkdownSettings>
+
+export const PreviewSettings = z.object({ allowRemoteImages: z.boolean().default(false) })
+export type PreviewSettings = z.infer<typeof PreviewSettings>
+
 export const Settings = z.object({
   editor: EditorSettings.prefault({}),
   files: FilesSettings.prefault({}),
   search: SearchSettings.prefault({}),
+  markdown: MarkdownSettings.prefault({}),
+  preview: PreviewSettings.prefault({}),
   theme: z.string().default('moru-dark'),
   languages: z.record(z.string(), EditorSettings.partial()).default({}),
   log: z.object({ level: z.enum(['debug', 'info', 'warn', 'error']).default('info') }).prefault({}),

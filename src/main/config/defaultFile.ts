@@ -20,6 +20,9 @@ export const defaultFileText = `{
     "defaultEncoding": "utf8",
     "defaultEol": "auto"
   },
+  "search": { "encoding": "auto", "maxFileSizeMb": 10, "exclude": [] },
+  "markdown": { "katex": false, "linkOnPaste": true },
+  "preview": { "allowRemoteImages": false },
   "theme": "moru-dark",
   // per-language overrides use the language id as the key
   "languages": {

@@ -3,7 +3,7 @@ import { go } from '@codemirror/lang-go'
 import { html } from '@codemirror/lang-html'
 import { javascript } from '@codemirror/lang-javascript'
 import { json } from '@codemirror/lang-json'
-import { markdown } from '@codemirror/lang-markdown'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { python } from '@codemirror/lang-python'
 import { rust } from '@codemirror/lang-rust'
 import { sql } from '@codemirror/lang-sql'
@@ -24,7 +24,7 @@ export const languages: readonly Language[] = [
   { id: 'javascript', name: 'JavaScript', load: () => javascript() },
   { id: 'jsx', name: 'JSX', load: () => javascript({ jsx: true }) },
   { id: 'json', name: 'JSON', load: () => json() },
-  { id: 'markdown', name: 'Markdown', load: () => markdown() },
+  { id: 'markdown', name: 'Markdown', load: () => markdown({ base: markdownLanguage }) },
   { id: 'python', name: 'Python', load: () => python() },
   { id: 'rust', name: 'Rust', load: () => rust() },
   { id: 'go', name: 'Go', load: () => go() },

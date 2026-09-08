@@ -36,6 +36,7 @@ import { type FindSpec, defaultFindSpec, inSelectionField, setInSelectionRanges 
 import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
+import { markdownExtensions } from '../markdown/extension'
 import { invoke, on } from '../ipc'
 import { searchState as searchLocal } from '../search/local'
 import {
@@ -379,6 +380,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
   const extensionsFor = (languageId: string): Extension => [
     baseExtensions(languageById(languageId).load(), { onUpdate }),
+    languageId === 'markdown' ? markdownExtensions({ linkOnPaste: () => settings().markdown.linkOnPaste }) : [],
     indentOverride.of([]),
     settingsCompartment.of(configExtensions(resolveForLanguage(settings(), languageId))),
     themeCompartment.of(themeById(settings().theme).editor),
