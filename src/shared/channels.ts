@@ -38,6 +38,12 @@ export const channels = {
   fsChanged: 'fs.changed',
   fsDeleted: 'fs.deleted',
   indexChanged: 'index.changed',
+  searchRun: 'search.run',
+  searchCancel: 'search.cancel',
+  searchReplace: 'search.replace',
+  searchUndoLast: 'search.undoLast',
+  searchBatch: 'search.batch',
+  searchDone: 'search.done',
 } as const
 
 export type Channel = (typeof channels)[keyof typeof channels]
@@ -53,6 +59,8 @@ export const pushChannels: readonly Channel[] = [
   channels.fsChanged,
   channels.fsDeleted,
   channels.indexChanged,
+  channels.searchBatch,
+  channels.searchDone,
 ]
 
 export const channelList: readonly Channel[] = Object.values(channels).filter((c) => !pushChannels.includes(c))

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ReplacePlan, ReplaceReport, SearchBatch, SearchDone, SearchSpec } from './search'
 import { ConfigSnapshot } from './config'
 import { encodingNames, eolNames } from './encoding'
 import { KeymapSnapshot } from './keymapFile'
@@ -128,6 +129,13 @@ export const contracts = {
     request: z.object({ text: z.string(), limit: z.number().int().positive() }),
     response: ipcResult(z.object({ items: z.array(IndexItem) }), UnexpectedError),
   },
+  'search.run': {
+    request: z.object({ id: z.string(), spec: SearchSpec, roots: z.array(z.string()).min(1) }),
+    response: ipcResult(z.literal(true), UnexpectedError),
+  },
+  'search.cancel': { request: z.object({ id: z.string() }), response: ipcResult(z.literal(true), UnexpectedError) },
+  'search.replace': { request: ReplacePlan, response: ipcResult(ReplaceReport, UnexpectedError) },
+  'search.undoLast': { request: z.undefined(), response: ipcResult(z.object({ report: ReplaceReport.nullable() }), UnexpectedError) },
   'session.load': {
     request: z.undefined(),
     response: ipcResult(z.object({ session: SessionFile.nullable() }), UnexpectedError),
@@ -172,6 +180,8 @@ export const pushContracts = {
   'fs.changed': z.object({ path: z.string(), hash: z.string(), mtimeMs: z.number() }),
   'fs.deleted': z.object({ path: z.string() }),
   'index.changed': z.object({ files: z.number().int() }),
+  'search.batch': SearchBatch,
+  'search.done': SearchDone,
 } as const
 export type PushChannel = keyof typeof pushContracts
 export type PushPayload<C extends PushChannel> = z.infer<(typeof pushContracts)[C]>

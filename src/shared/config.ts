@@ -28,9 +28,17 @@ export const FilesSettings = z.object({
 })
 export type FilesSettings = z.infer<typeof FilesSettings>
 
+export const SearchSettings = z.object({
+  encoding: z.enum(['auto', ...encodingNames]).default('auto'),
+  maxFileSizeMb: z.number().int().min(1).max(1024).default(10),
+  exclude: z.array(z.string()).default([]),
+})
+export type SearchSettings = z.infer<typeof SearchSettings>
+
 export const Settings = z.object({
   editor: EditorSettings.prefault({}),
   files: FilesSettings.prefault({}),
+  search: SearchSettings.prefault({}),
   theme: z.string().default('moru-dark'),
   languages: z.record(z.string(), EditorSettings.partial()).default({}),
   log: z.object({ level: z.enum(['debug', 'info', 'warn', 'error']).default('info') }).prefault({}),

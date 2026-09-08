@@ -33,14 +33,4 @@ export const inSelectionField = StateField.define<readonly SelectionRange[] | nu
   },
 })
 
-const isUpper = (s: string): boolean => s === s.toUpperCase() && s !== s.toLowerCase()
-const isLower = (s: string): boolean => s === s.toLowerCase() && s !== s.toUpperCase()
-const isCapitalized = (s: string): boolean =>
-  s.length > 0 && isUpper(s.charAt(0)) && s.slice(1) === s.slice(1).toLowerCase() && s.length > 1
-
-export const preserveCaseOf = (sample: string, replacement: string): string => {
-  if (isUpper(sample)) return replacement.toUpperCase()
-  if (isCapitalized(sample)) return replacement.charAt(0).toUpperCase() + replacement.slice(1).toLowerCase()
-  if (isLower(sample)) return replacement.toLowerCase()
-  return replacement
-}
+export { preserveCaseOf } from '@shared/replaceText'

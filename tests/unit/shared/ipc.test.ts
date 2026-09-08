@@ -92,4 +92,14 @@ describe('ipc contracts', () => {
     expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], projectRoot: '/x', windowId: 'w1', session: null, test: false } }).success).toBe(true)
     expect(schema.safeParse({ ok: true, value: { paths: [], test: true } }).success).toBe(false)
   })
+
+  it('search.run request fills include/exclude defaults', () => {
+    const parsed = contracts['search.run'].request.parse({
+      id: 'a',
+      spec: { pattern: 'x', regexp: false, caseSensitive: false, wholeWord: false },
+      roots: ['/r'],
+    })
+    expect(parsed.spec).toEqual({ pattern: 'x', regexp: false, caseSensitive: false, wholeWord: false, include: '', exclude: '' })
+    expect(contracts['search.run'].request.safeParse({ id: 'a', spec: parsed.spec, roots: [] }).success).toBe(false)
+  })
 })
