@@ -338,6 +338,7 @@ dirty 텍스트는 dirty store에 별도 (크기 때문)
 | 어느 쪽 | 파일 없음 | 탭은 열고 "삭제됨" 배너, dirty면 텍스트 복원 |
 | untitled | — | dirty store에서 복원 |
 | terminal | — | cwd만 복원, 프로세스 재시작 |
+| search | — | 쿼리 복원 후 재실행 |
 
 - `cleanExit == false`(크래시)여도 같은 경로. dirty store가 진실.
 - Hot exit: 종료 시 "저장할까요?"를 묻지 않는다. `files.hotExit`(기본 true). false면 dirty 버퍼가 있을 때 모달 확인.
