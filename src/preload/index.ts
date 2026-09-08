@@ -1,16 +1,24 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import { channelList, sendChannels } from '../shared/channels'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { channelList, pushChannels, sendChannels } from '../shared/channels'
 
 const allowed = (list: readonly string[], channel: string): boolean => list.includes(channel)
 
 const api = {
   invoke: (channel: string, payload: unknown): Promise<unknown> =>
-    allowed(channelList, channel)
+    allowed(channelList, channel) && !allowed(sendChannels, channel)
       ? ipcRenderer.invoke(channel, payload)
       : Promise.reject(new Error(`ipc channel not allowed: ${channel}`)),
 
   send: (channel: string, payload: unknown): void => {
     if (allowed(sendChannels, channel)) ipcRenderer.send(channel, payload)
+  },
+
+  on: (channel: string, listener: (payload: unknown) => void): (() => void) => {
+    if (!allowed(pushChannels, channel)) return () => undefined
+
+    const wrapped = (_event: IpcRendererEvent, payload: unknown): void => listener(payload)
+    ipcRenderer.on(channel, wrapped)
+    return () => ipcRenderer.removeListener(channel, wrapped)
   },
 }
 

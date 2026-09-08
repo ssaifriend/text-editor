@@ -1,12 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { contracts } from '@shared/ipc'
-import { channelList, sendChannels } from '@shared/channels'
+import { contracts, pushContracts } from '@shared/ipc'
+import { channelList, pushChannels, sendChannels } from '@shared/channels'
 
 describe('ipc contracts', () => {
   it('every invoke channel has a contract and every contract is an allowed channel', () => {
     const contractChannels = Object.keys(contracts).sort()
     const invokeChannels = channelList.filter((c) => !sendChannels.includes(c)).sort()
     expect(contractChannels).toEqual(invokeChannels)
+  })
+
+  it('every push channel has a push contract', () => {
+    expect(Object.keys(pushContracts).sort()).toEqual([...pushChannels].sort())
   })
 
   it('fs.open request is an object with path and optional encoding', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { R } from '@mobily/ts-belt'
-import { invoke } from '@renderer/ipc'
+import { invoke, on } from '@renderer/ipc'
 
 const bridge = { invoke: vi.fn(), send: vi.fn() }
 
@@ -41,5 +41,23 @@ describe('renderer invoke', () => {
 
     expect(R.isError(result)).toBe(true)
     R.tapError(result, (e) => expect(e.kind).toBe('unexpected'))
+  })
+})
+
+describe('renderer on', () => {
+  it('registers through the bridge and forwards parsed payloads', () => {
+    const listeners: Array<(p: unknown) => void> = []
+    const bridgeOn = vi.fn((_c: string, l: (p: unknown) => void) => {
+      listeners.push(l)
+      return () => undefined
+    })
+    ;(globalThis as { window?: unknown }).window = { moru: { ...bridge, on: bridgeOn } }
+
+    const handler = vi.fn()
+    on('config.changed', handler)
+    listeners[0]!({ anything: true })
+
+    expect(bridgeOn).toHaveBeenCalledWith('config.changed', expect.any(Function))
+    expect(handler).toHaveBeenCalledWith({ anything: true })
   })
 })
