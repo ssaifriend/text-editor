@@ -38,7 +38,7 @@ type Deps = { readonly rgPath: string; readonly subscribe: Subscribe; readonly p
 
 export type IndexService = {
   readonly build: (root: string) => Promise<{ files: number; truncated: boolean }>
-  readonly query: (text: string, limit: number) => IndexItem[]
+  readonly query: (text: string, limit: number) => Promise<IndexItem[]>
   readonly root: () => string | null
   readonly dispose: () => Promise<void>
 }
@@ -48,6 +48,7 @@ export const createIndexService = ({ rgPath, subscribe, push, debounceMs = 500 }
   let matcher: Matcher | null = null
   let subscription: AsyncSubscription | null = null
   let timer: NodeJS.Timeout | null = null
+  let building: Promise<unknown> = Promise.resolve()
 
   const rebuild = async (): Promise<{ files: number; truncated: boolean }> => {
     if (!root) return { files: 0, truncated: false }
@@ -61,22 +62,29 @@ export const createIndexService = ({ rgPath, subscribe, push, debounceMs = 500 }
     timer = setTimeout(() => void rebuild().then((r) => push('index.changed', { files: r.files })), debounceMs)
   }
 
-  const build = async (nextRoot: string): Promise<{ files: number; truncated: boolean }> => {
-    if (subscription) await subscription.unsubscribe()
-    root = nextRoot
-    subscription = await subscribe(
-      nextRoot,
-      (err, events) => {
-        if (!err && events.some((e) => e.type !== 'update')) scheduleRebuild()
-      },
-      { ignore: ['**/node_modules/**', '**/.git/**'] },
-    )
-    return rebuild()
+  const build = (nextRoot: string): Promise<{ files: number; truncated: boolean }> => {
+    const run = async () => {
+      if (subscription) await subscription.unsubscribe()
+      root = nextRoot
+      subscription = await subscribe(
+        nextRoot,
+        (err, events) => {
+          if (!err && events.some((e) => e.type !== 'update')) scheduleRebuild()
+        },
+        { ignore: ['**/node_modules/**', '**/.git/**'] },
+      )
+      return rebuild()
+    }
+    building = run()
+    return building as Promise<{ files: number; truncated: boolean }>
   }
 
   return {
     build,
-    query: (text, limit) => matcher?.query(text, limit) ?? [],
+    query: async (text, limit) => {
+      await building.catch(() => undefined)
+      return matcher?.query(text, limit) ?? []
+    },
     root: () => root,
     dispose: async () => {
       if (timer) clearTimeout(timer)

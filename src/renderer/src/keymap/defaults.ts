@@ -11,10 +11,12 @@ const common: readonly Binding[] = [
   { keys: 'mod+shift+s', command: 'file.saveAs' },
   { keys: 'mod+w', command: 'tab.close' },
   { keys: 'mod+shift+p', command: 'palette.commands' },
+  { keys: 'mod+p', command: 'palette.goto' },
+  { keys: 'mod+r', command: 'palette.gotoSymbol' },
+  { keys: 'ctrl+g', command: 'palette.gotoLine' },
+  { keys: 'mod+;', command: 'palette.gotoWord' },
   { keys: 'mod+f', command: 'find.open' },
   { keys: 'mod+alt+f', command: 'find.openReplace' },
-  { keys: 'mod+g', command: 'find.next' },
-  { keys: 'mod+shift+g', command: 'find.previous' },
   { keys: 'mod+alt+2', command: 'view.splitRight' },
   { keys: 'mod+alt+shift+2', command: 'view.splitDown' },
   { keys: 'mod+alt+1', command: 'view.singlePane' },
@@ -57,6 +59,8 @@ const mac: readonly Binding[] = [
   editor('ctrl+shift+arrowup', 'editor.addCursorAbove'),
   editor('ctrl+shift+arrowdown', 'editor.addCursorBelow'),
   editor('ctrl+mod+g', 'editor.selectAllOccurrences'),
+  { keys: 'mod+g', command: 'find.next' },
+  { keys: 'mod+shift+g', command: 'find.previous' },
 ]
 
 const win: readonly Binding[] = [
@@ -67,6 +71,8 @@ const win: readonly Binding[] = [
   editor('ctrl+alt+arrowdown', 'editor.addCursorBelow'),
   editor('alt+f3', 'editor.selectAllOccurrences'),
   editor('ctrl+y', 'editor.redo'),
+  { keys: 'f3', command: 'find.next' },
+  { keys: 'shift+f3', command: 'find.previous' },
 ]
 
 export const defaultBindings = (platform: Platform): readonly Binding[] => [

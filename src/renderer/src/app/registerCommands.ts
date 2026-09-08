@@ -7,7 +7,10 @@ import { editorCommands } from '../editor/commands'
 import { invoke } from '../ipc'
 import type { Workspace } from './workspace'
 
-type Ui = { readonly openPalette: () => void; readonly userBindings: () => readonly CompiledBinding[] }
+type Ui = {
+  readonly openPalette: (mode: 'commands' | 'goto', text?: string) => void
+  readonly userBindings: () => readonly CompiledBinding[]
+}
 
 const asIndex = (args: unknown): number => (typeof args === 'number' ? args : Number(args) || 1)
 
@@ -40,7 +43,11 @@ export const registerAppCommands = (registry: CommandRegistry, ws: Workspace, ui
     { id: 'view.closePane', title: 'View: Close Pane', run: () => ws.closeActivePane() },
     { id: 'view.singlePane', title: 'View: Single Pane', run: () => ws.singlePane() },
     { id: 'view.focusPane', title: 'View: Focus Pane by Index', run: (args) => ws.focusPaneIndex(asIndex(args)) },
-    { id: 'palette.commands', title: 'Command Palette', run: () => ui.openPalette() },
+    { id: 'palette.commands', title: 'Command Palette', run: () => ui.openPalette('commands') },
+    { id: 'palette.goto', title: 'Goto Anything…', run: () => ui.openPalette('goto') },
+    { id: 'palette.gotoSymbol', title: 'Goto Symbol…', when: 'hasBuffer', run: () => ui.openPalette('goto', '@') },
+    { id: 'palette.gotoLine', title: 'Goto Line…', when: 'hasBuffer', run: () => ui.openPalette('goto', ':') },
+    { id: 'palette.gotoWord', title: 'Goto Word…', when: 'hasBuffer', run: () => ui.openPalette('goto', '#') },
     { id: 'find.open', title: 'Find', when: 'hasBuffer', run: () => ws.openFind(false) },
     { id: 'find.openReplace', title: 'Replace', when: 'hasBuffer', run: () => ws.openFind(true) },
     { id: 'find.next', title: 'Find Next', when: 'hasBuffer', run: () => ws.findNext() },

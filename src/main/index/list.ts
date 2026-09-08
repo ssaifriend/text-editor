@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process'
+import { sep } from 'node:path'
+
+const toPosix = (p: string): string => (sep === '\\' ? p.split(sep).join('/') : p)
 
 export const listFiles = (
   root: string,
@@ -12,7 +15,7 @@ export const listFiles = (
       const all = String(stdout)
         .split('\0')
         .filter((p) => p.length > 0)
-        .map((p) => p.normalize('NFC'))
+        .map((p) => toPosix(p).normalize('NFC'))
         .sort()
       resolve({ files: all.slice(0, cap), truncated: all.length > cap })
     })

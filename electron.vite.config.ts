@@ -6,7 +6,7 @@ const shared = { '@shared': resolve('src/shared') }
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['fzf'] })],
     resolve: { alias: shared },
   },
   preload: {

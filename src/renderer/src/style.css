@@ -370,3 +370,7 @@ html, body, #root {
 .find-count { min-width: 64px; text-align: right; opacity: 0.8; white-space: nowrap; }
 
 .cm-panels { display: none; }
+
+.tab.preview .tab-title { font-style: italic; opacity: 0.8; }
+.palette-item.hint { opacity: 0.6; font-style: italic; }
+.palette-title mark { background: transparent; color: #f9ae58; font-weight: bold; }

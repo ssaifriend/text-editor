@@ -4,6 +4,7 @@ import type { Accessor } from 'solid-js'
 import type { Workspace } from './app/workspace'
 import type { CommandRegistry } from './commands/registry'
 import type { WhenContext } from './commands/when'
+import type { PaletteMode } from './ui/palette/mode'
 import type { CompiledBinding } from './keymap/bindings'
 import { type FileMeta, type Format, isDirty } from './editor/buffers'
 import { whenContext } from './app/context'
@@ -26,6 +27,8 @@ export type MoruTestHooks = {
   runCommand(id: string, args?: unknown): Promise<boolean>
   openPath(path: string): Promise<boolean>
   paletteOpen(): boolean
+  paletteMode(): string | null
+  paletteItems(): string[]
   context(): WhenContext
   editorSettings(): { tabSize: number; indentUnit: string; lineNumbers: boolean; wordWrap: boolean }
   ready(): boolean
@@ -54,7 +57,7 @@ declare global {
 export const installTestHooks = (
   ws: Workspace,
   registry: CommandRegistry,
-  paletteOpen: Accessor<boolean>,
+  paletteMode: Accessor<PaletteMode | null>,
   ready: Accessor<boolean>,
   bindings: Accessor<readonly CompiledBinding[]>,
 ): void => {
@@ -97,8 +100,10 @@ export const installTestHooks = (
       })),
     runCommand: (id, args) => registry.run(id, args),
     openPath: (path) => ws.openFile(path),
-    paletteOpen,
-    context: () => whenContext(ws, { paletteOpen: paletteOpen() }),
+    paletteOpen: () => paletteMode() !== null,
+    paletteMode: () => paletteMode(),
+    paletteItems: () => Array.from(document.querySelectorAll('[data-testid="palette-item"] .palette-title')).map((el) => el.textContent ?? ''),
+    context: () => whenContext(ws, { paletteOpen: paletteMode() !== null }),
     editorSettings: () => {
       const v = view()
       return {

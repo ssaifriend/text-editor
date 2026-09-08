@@ -19,13 +19,19 @@ import { applyTheme } from './theme/apply'
 import { themeById } from './theme/themes'
 import { PaneView } from './ui/layout/PaneView'
 import { Sidebar } from './ui/sidebar/Sidebar'
-import { CommandPalette } from './ui/palette/CommandPalette'
+import { Palette, type PaletteMode } from './ui/palette/Palette'
 import { StatusBar } from './ui/statusbar/StatusBar'
 
 const platform = (): Platform => (navigator.platform.toLowerCase().includes('mac') ? 'mac' : 'win')
 
 export const App = () => {
-  const [paletteOpen, setPaletteOpen] = createSignal(false)
+  const [paletteMode, setPaletteMode] = createSignal<PaletteMode | null>(null)
+  const [paletteText, setPaletteText] = createSignal('')
+  const paletteOpen = () => paletteMode() !== null
+  const openPalette = (mode: PaletteMode, text = ''): void => {
+    setPaletteText(text)
+    setPaletteMode(mode)
+  }
   const [ready, setReady] = createSignal(false)
   const settingsStore = createSettings()
   const dirtySync = createDirtySync({
@@ -52,7 +58,7 @@ export const App = () => {
 
   const context = () => whenContext(ws, { paletteOpen: paletteOpen() })
   const registry = createCommandRegistry(context)
-  registerAppCommands(registry, ws, { openPalette: () => setPaletteOpen(true), userBindings: compiledUserBindings })
+  registerAppCommands(registry, ws, { openPalette, userBindings: compiledUserBindings })
 
   createEffect(
     onSignal(
@@ -63,6 +69,15 @@ export const App = () => {
         ws.applySettings(s)
       },
       { defer: true },
+    ),
+  )
+
+  createEffect(
+    onSignal(
+      () => ws.state.projectRoot,
+      (root) => {
+        if (root) void invoke('index.build', { root })
+      },
     ),
   )
 
@@ -84,7 +99,7 @@ export const App = () => {
       session: null,
       test: false,
     })
-    if (boot.test) installTestHooks(ws, registry, paletteOpen, ready, bindings)
+    if (boot.test) installTestHooks(ws, registry, paletteMode, ready, bindings)
 
     await settingsStore.load()
     applyEditorFont(settingsStore.settings().editor)
@@ -123,15 +138,17 @@ export const App = () => {
           <StatusBar ws={ws} />
         </div>
       </div>
-      <CommandPalette
-        open={paletteOpen}
+      <Palette
+        open={paletteMode}
+        initialText={paletteText}
         onClose={() => {
-          setPaletteOpen(false)
+          setPaletteMode(null)
           ws.activeView()?.focus()
         }}
         registry={registry}
         bindings={bindings}
         platform={platform()}
+        ws={ws}
       />
     </div>
   )

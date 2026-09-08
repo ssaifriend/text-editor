@@ -60,7 +60,7 @@ import {
 } from '../ui/layout/paneTree'
 
 export type Tab =
-  | { readonly id: TabId; readonly kind: 'buffer'; readonly bufferId: BufferId }
+  | { readonly id: TabId; readonly kind: 'buffer'; readonly bufferId: BufferId; readonly preview?: boolean }
   | { readonly id: TabId; readonly kind: 'terminal'; readonly ptyId: string }
   | { readonly id: TabId; readonly kind: 'diff'; readonly bufferId: BufferId; readonly diskText: string; readonly bufferText: string; readonly title: string }
 
@@ -110,6 +110,7 @@ export type WorkspaceState = {
     history: string[]
   }
   findFocused: boolean
+  mru: string[]
   sidebar: { open: boolean; expanded: Record<string, true>; entries: Record<string, TreeEntry[]> }
   activePane: PaneId
   editorFocused: boolean
@@ -169,6 +170,11 @@ export type Workspace = {
   readonly setWindowId: (id: string) => void
   readonly snapshot: () => WindowSnapshot
   readonly restoreSession: (snapshot: WindowSnapshot, dirtyEntries: readonly DirtyEntry[]) => Promise<void>
+  readonly previewFile: (path: string) => Promise<boolean>
+  readonly commitPreview: () => void
+  readonly cancelPreview: () => void
+  readonly jumpTo: (pos: number) => void
+  readonly gotoLine: (line: number, col: number | null) => void
   readonly openFind: (withReplace: boolean) => void
   readonly closeFind: () => void
   readonly setFindSpec: (patch: Partial<FindSpec>) => void
@@ -261,6 +267,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     windowId: 'unknown',
     find: { open: false, replaceOpen: false, spec: defaultFindSpec, valid: false, count: 0, capped: false, current: null, history: [] },
     findFocused: false,
+    mru: [],
     sidebar: { open: true, expanded: {}, entries: {} },
     activePane: firstPane,
     editorFocused: false,
@@ -420,11 +427,15 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     return tab && leaf ? { paneId: leaf.id, tabId: tab.id } : null
   }
 
+  const touchMru = (path: string): void =>
+    setState('mru', [path, ...state.mru.filter((p) => p !== path)].slice(0, 50))
+
   const openFile = async (path: string): Promise<boolean> => {
     const existing = tabForPath(path)
     if (existing) {
       setTree(setActiveTab(currentTree, existing.paneId, existing.tabId))
       focusView(existing.paneId)
+      touchMru(path)
       return true
     }
 
@@ -434,6 +445,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       (file: OpenedFile) => {
         addBufferTab(createBuffer(nextBufferId(), file, stateFor, untitledFormat()))
         void invoke('fs.watch', { path: file.path })
+        touchMru(file.path)
         setState('status', `opened ${file.path}`)
         return true
       },
@@ -756,8 +768,10 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       const current = buffers[buffer.id]
       if (!current) return
       if (current.meta?.hash === file.hash) return
-      if (isDirty(current)) setState('banners', current.id, { kind: 'external', diskHash: file.hash })
-      else applySilentReload(current, file)
+      if (!isDirty(current)) return applySilentReload(current, file)
+
+      const kind = state.banners[current.id]?.kind === 'conflict' ? 'conflict' : 'external'
+      setState('banners', current.id, { kind, diskHash: file.hash })
     })
   }
 
@@ -1001,6 +1015,62 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     )
   }
 
+  let previewOrigin: { paneId: PaneId; tabId: TabId | null } | null = null
+
+  const previewTabId = (): TabId | null => D.values(state.tabs).find((t) => t.kind === 'buffer' && t.preview)?.id ?? null
+
+  const previewFile = async (path: string): Promise<boolean> => {
+    const alreadyOpen = tabForPath(path)
+    if (alreadyOpen) {
+      if (!previewOrigin) previewOrigin = { paneId: state.activePane, tabId: activeLeaf().active }
+      setTree(setActiveTab(currentTree, alreadyOpen.paneId, alreadyOpen.tabId))
+      return true
+    }
+
+    if (!previewOrigin) previewOrigin = { paneId: state.activePane, tabId: activeLeaf().active }
+    const previous = previewTabId()
+    if (previous) dropTab(previous)
+
+    const opened = await openFile(path)
+    const leaf = activeLeaf()
+    const tab = leaf.active ? state.tabs[leaf.active] : undefined
+    if (opened && tab?.kind === 'buffer') setState('tabs', tab.id, { ...tab, preview: true })
+    return opened
+  }
+
+  const commitPreview = (): void => {
+    const id = previewTabId()
+    const tab = id ? state.tabs[id] : undefined
+    if (tab?.kind === 'buffer') setState('tabs', tab.id, { ...tab, preview: false })
+    previewOrigin = null
+  }
+
+  const cancelPreview = (): void => {
+    const id = previewTabId()
+    if (id) dropTab(id)
+    if (previewOrigin) {
+      const { paneId, tabId } = previewOrigin
+      if (tabId && findLeaf(currentTree, paneId)?.tabs.includes(tabId)) setTree(setActiveTab(currentTree, paneId, tabId))
+      focusView(findLeaf(currentTree, paneId) ? paneId : state.activePane)
+    }
+    previewOrigin = null
+  }
+
+  const jumpTo = (pos: number): void => {
+    const view = activeView()
+    if (!view) return
+    const clamped = Math.min(Math.max(0, pos), view.state.doc.length)
+    view.dispatch({ selection: { anchor: clamped }, scrollIntoView: true })
+  }
+
+  const gotoLine = (line: number, col: number | null): void => {
+    const view = activeView()
+    if (!view) return
+    const lineNo = Math.min(Math.max(1, line), view.state.doc.lines)
+    const info = view.state.doc.line(lineNo)
+    jumpTo(Math.min(info.from + Math.max(0, (col ?? 1) - 1), info.to))
+  }
+
   const activeQuery = (editorState?: EditorState) => {
     const view = activeView()
     const st = editorState ?? view?.state
@@ -1145,6 +1215,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     const tab = state.tabs[tabId]
     if (!tab) return null
     if (tab.kind === 'buffer') {
+      if (tab.preview) return null
       const buffer = buffers[tab.bufferId]
       return buffer ? bufferSnapshot(buffer) : null
     }
@@ -1180,6 +1251,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     layout: paneSnapshot(currentTree),
     activePath: pathToLeaf(currentTree, state.activePane) ?? [],
     findHistory: [...state.find.history],
+    recentFiles: [...state.mru],
   })
 
   const treeFromSnapshot = (snap: PaneSnapshot): { tree: PaneNode; leaves: { id: PaneId; snap: LeafSnapshot }[] } => {
@@ -1261,6 +1333,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
     setState('sidebar', 'open', snap.sidebar.open)
     if (snap.findHistory) setState('find', 'history', [...snap.findHistory])
+    if (snap.recentFiles) setState('mru', [...snap.recentFiles])
     for (const dir of snap.sidebar.expanded) await expandDir(dir)
 
     const targetLeaf = leafAtPath(currentTree, snap.activePath) ?? leaves(currentTree)[0]
@@ -1334,6 +1407,11 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     setWindowId: (id) => setState('windowId', id),
     snapshot,
     restoreSession,
+    previewFile,
+    commitPreview,
+    cancelPreview,
+    jumpTo,
+    gotoLine,
     openFind,
     closeFind,
     setFindSpec,

@@ -67,7 +67,7 @@ describe('readTextFile', () => {
     const result = await readTextFile(path)
 
     expect(result.ok).toBe(true)
-    if (result.ok) expect(result.value.readonly).toBe(process.platform !== 'win32')
+    if (result.ok) expect(result.value.readonly).toBe(true)
   })
 
   it('reads utf16le BOM files without treating their NUL bytes as binary', async () => {

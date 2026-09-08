@@ -62,7 +62,7 @@ export const registerHandlers = ({
 
   handle('index.build', async ({ root }) => ok(await index.build(root)))
 
-  handle('index.query', async ({ text, limit }) => ok({ items: index.query(text, limit) }))
+  handle('index.query', async ({ text, limit }) => ok({ items: await index.query(text, limit) }))
 
   ipcMain.on(channels.sessionSave, (event, raw: unknown) => {
     const parsed = WindowSnapshot.safeParse(raw)

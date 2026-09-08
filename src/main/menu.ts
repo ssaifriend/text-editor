@@ -61,6 +61,14 @@ export const installMenu = (): void => {
         { role: 'toggleDevTools' },
       ],
     },
+    {
+      label: 'Goto',
+      submenu: [
+        command('Goto Anything…', 'palette.goto', 'CmdOrCtrl+P'),
+        command('Goto Symbol…', 'palette.gotoSymbol', 'CmdOrCtrl+R'),
+        command('Goto Line…', 'palette.gotoLine', 'Ctrl+G'),
+      ],
+    },
     { role: 'windowMenu' },
   ]
 

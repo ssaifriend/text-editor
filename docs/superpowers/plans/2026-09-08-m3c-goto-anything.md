@@ -504,7 +504,7 @@ test('file@symbol and file:line jump after opening', async () => {
   await expect.poll(() => items(page)).toContain('Gamma')
   await page.keyboard.press('Enter')
   await expect.poll(() => page.evaluate(() => window.__moruTest!.path())).toBe(join(root, 'src', 'app', 'workspace.ts'))
-  await expect.poll(() => page.evaluate(() => window.__moruTest!.selections()[0]?.from)).toBe(47)
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.selections()[0]?.from)).toBe(48)
 
   await page.keyboard.press(`${mod}+p`)
   await page.keyboard.type('readme:30')

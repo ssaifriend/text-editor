@@ -23,7 +23,11 @@ export const TabStrip = (props: Props) => (
           <div
             class="tab"
             role="tab"
-            classList={{ active: props.leaf().active === tabId, dirty: meta()?.dirty ?? false }}
+            classList={{
+              active: props.leaf().active === tabId,
+              dirty: meta()?.dirty ?? false,
+              preview: (() => { const t = tab(); return t?.kind === 'buffer' && t.preview === true })(),
+            }}
             title={meta()?.path ?? title()}
             onMouseDown={(e) => {
               if (e.button === 1) void props.ws.closeTab(tabId)
