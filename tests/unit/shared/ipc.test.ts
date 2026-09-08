@@ -9,6 +9,13 @@ describe('ipc contracts', () => {
     expect(contractChannels).toEqual(invokeChannels)
   })
 
+  it('dialog.confirmClose and command.run have contracts', () => {
+    expect(contracts['dialog.confirmClose'].response.safeParse({ ok: true, value: { choice: 'save' } }).success).toBe(true)
+    expect(contracts['dialog.confirmClose'].response.safeParse({ ok: true, value: { choice: 'maybe' } }).success).toBe(false)
+    expect(pushContracts['command.run'].safeParse({ id: 'file.save' }).success).toBe(true)
+    expect(pushContracts['command.run'].safeParse({ id: 'tab.select', args: 2 }).success).toBe(true)
+  })
+
   it('every push channel has a push contract', () => {
     expect(Object.keys(pushContracts).sort()).toEqual([...pushChannels].sort())
   })

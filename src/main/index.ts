@@ -8,6 +8,7 @@ import { createConfigService } from './config/service'
 import { registerHandlers } from './ipc/handlers'
 import { pushToAll } from './ipc/push'
 import { initLogging, installCrashHooks, logger, registerLogChannel } from './log'
+import { installMenu } from './menu'
 import { markDidFinishLoad, markFirstPaint, markReady, metrics } from './perf'
 import { probePty } from './pty/probe'
 import { createDirtyStore } from './session/dirtyStore'
@@ -52,6 +53,7 @@ app.whenReady().then(async () => {
   const dirty = createDirtyStore(userData)
   registerHandlers({ config, dirty, startupPaths: startupPaths() })
   registerLogChannel()
+  installMenu()
   ipcMain.on(channels.perfFirstPaint, markFirstPaint)
   if (isTest) exposeTestGlobals()
 
