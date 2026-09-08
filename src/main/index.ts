@@ -2,12 +2,14 @@ import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { delimiter, resolve } from 'node:path'
 import watcher from '@parcel/watcher'
+import { rgPath } from '@vscode/ripgrep'
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { A, pipe } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
 import type { Bounds, WindowSnapshot } from '@shared/session'
 import { createConfigService, createKeymapService } from './config/service'
+import { createIndexService } from './index/service'
 import { registerHandlers } from './ipc/handlers'
 import { pushToAll } from './ipc/push'
 import { initLogging, installCrashHooks, logger, registerLogChannel } from './log'
@@ -79,9 +81,11 @@ app.whenReady().then(async () => {
   app.on('before-quit', () => {
     ptyManager.disposeAll()
     void watch.dispose()
+    void index.dispose()
   })
   const windows = createWindowRegistry()
   const sessionStore = createSessionStore(userData)
+  const index = createIndexService({ rgPath, subscribe: watcher.subscribe, push: pushToAll })
 
   let quitting = false
   app.on('before-quit', () => {
@@ -115,6 +119,7 @@ app.whenReady().then(async () => {
     windows,
     openWindow: (projectRoot) => void openWindow([], projectRoot),
     session: sessionStore,
+    index,
   })
   registerLogChannel()
   installMenu()

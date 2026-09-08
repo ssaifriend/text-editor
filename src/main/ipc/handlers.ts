@@ -8,6 +8,7 @@ import type { ConfigService, KeymapService } from '../config/service'
 import { createFile, renamePath, trashPath } from '../fs/ops'
 import { readTextFile } from '../fs/read'
 import { listDirectory } from '../fs/tree'
+import type { IndexService } from '../index/service'
 import { writeTextFile } from '../fs/write'
 import type { PtyManager } from '../pty/manager'
 import type { DirtyStore } from '../session/dirtyStore'
@@ -30,6 +31,7 @@ export type HandlerDeps = {
   readonly windows: WindowRegistry
   readonly openWindow: (projectRoot: string | null) => void
   readonly session: SessionStore
+  readonly index: IndexService
 }
 
 export const registerHandlers = ({
@@ -43,6 +45,7 @@ export const registerHandlers = ({
   windows,
   openWindow,
   session,
+  index,
 }: HandlerDeps): void => {
   handle('app.bootstrap', async (_request, { sender }) => {
     const info = windows.bySender(sender)
@@ -56,6 +59,10 @@ export const registerHandlers = ({
   })
 
   handle('session.load', async () => ok({ session: await session.load() }))
+
+  handle('index.build', async ({ root }) => ok(await index.build(root)))
+
+  handle('index.query', async ({ text, limit }) => ok({ items: index.query(text, limit) }))
 
   ipcMain.on(channels.sessionSave, (event, raw: unknown) => {
     const parsed = WindowSnapshot.safeParse(raw)

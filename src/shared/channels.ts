@@ -11,6 +11,8 @@ export const channels = {
   dialogOpenFolder: 'dialog.openFolder',
   windowNew: 'window.new',
   sessionLoad: 'session.load',
+  indexBuild: 'index.build',
+  indexQuery: 'index.query',
   sessionSave: 'session.save',
   dialogOpenFile: 'dialog.openFile',
   dialogSaveFile: 'dialog.saveFile',
@@ -35,6 +37,7 @@ export const channels = {
   ptyExit: 'pty.exit',
   fsChanged: 'fs.changed',
   fsDeleted: 'fs.deleted',
+  indexChanged: 'index.changed',
 } as const
 
 export type Channel = (typeof channels)[keyof typeof channels]
@@ -49,6 +52,7 @@ export const pushChannels: readonly Channel[] = [
   channels.ptyExit,
   channels.fsChanged,
   channels.fsDeleted,
+  channels.indexChanged,
 ]
 
 export const channelList: readonly Channel[] = Object.values(channels).filter((c) => !pushChannels.includes(c))

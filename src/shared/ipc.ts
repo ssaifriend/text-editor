@@ -96,6 +96,9 @@ export type CommandRun = z.infer<typeof CommandRun>
 export const TreeEntry = z.object({ name: z.string(), path: z.string(), kind: z.enum(['file', 'dir']) })
 export type TreeEntry = z.infer<typeof TreeEntry>
 
+export const IndexItem = z.object({ rel: z.string(), path: z.string(), positions: z.array(z.number().int()), score: z.number() })
+export type IndexItem = z.infer<typeof IndexItem>
+
 export const Bootstrap = z.object({
   paths: z.array(z.string()),
   projectRoot: z.string().nullable(),
@@ -117,6 +120,14 @@ export const contracts = {
   'fs.delete': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), OpenError) },
   'dialog.openFolder': { request: z.undefined(), response: ipcResult(DialogResult, UnexpectedError) },
   'window.new': { request: z.undefined(), response: ipcResult(z.literal(true), UnexpectedError) },
+  'index.build': {
+    request: z.object({ root: z.string() }),
+    response: ipcResult(z.object({ files: z.number().int(), truncated: z.boolean() }), UnexpectedError),
+  },
+  'index.query': {
+    request: z.object({ text: z.string(), limit: z.number().int().positive() }),
+    response: ipcResult(z.object({ items: z.array(IndexItem) }), UnexpectedError),
+  },
   'session.load': {
     request: z.undefined(),
     response: ipcResult(z.object({ session: SessionFile.nullable() }), UnexpectedError),
@@ -160,6 +171,7 @@ export const pushContracts = {
   'pty.exit': z.object({ id: z.string(), exitCode: z.number() }),
   'fs.changed': z.object({ path: z.string(), hash: z.string(), mtimeMs: z.number() }),
   'fs.deleted': z.object({ path: z.string() }),
+  'index.changed': z.object({ files: z.number().int() }),
 } as const
 export type PushChannel = keyof typeof pushContracts
 export type PushPayload<C extends PushChannel> = z.infer<(typeof pushContracts)[C]>
