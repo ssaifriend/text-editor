@@ -22,6 +22,7 @@ describe('index matcher', () => {
     mkdirSync('test-results', { recursive: true })
     writeFileSync('test-results/perf-index.json', JSON.stringify({ paths: 50_000, queryMs: Number(elapsed.toFixed(1)) }))
     expect(items.length).toBeGreaterThan(0)
-    expect(elapsed).toBeLessThan(process.env['CI'] ? 60 : 30)
+    // GitHub Windows runners measured 74 ms (v2 algorithm: 134 ms); the 30 ms budget is for the daily-driver machine.
+    expect(elapsed).toBeLessThan(process.env['CI'] ? 120 : 30)
   })
 })

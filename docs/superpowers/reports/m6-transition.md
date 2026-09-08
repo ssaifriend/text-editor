@@ -21,7 +21,7 @@
 | 콜드 스타트 → 첫 페인트 | < 1000 ms | **~380–560 ms** (전: 1025) | 로그인 셸 env 해석(`resolveShellEnv`)이 창 생성을 막고 있었음 → 첫 pty spawn 때까지 지연 |
 | 메모리: main + renderer private (`getProcessMemoryInfo`), 파일 10개, 터미널 없음 | < 300 MB | **154 MB** (main 55 + renderer 99) | workingSet 합은 386 MB — Electron 프레임워크 공유 페이지가 프로세스마다 중복 계산됨. JS 힙은 main 11 MB / renderer 17 MB |
 | 키 입력 → 다음 프레임 p95 (5k줄 TS, 하이라이팅 ON) | < 16 ms | **9.7 ms** (max 14.3) | 숨김 창은 `backgroundThrottling`으로 rAF가 지연됨 → `MORU_HIDDEN`일 때 끔 |
-| Goto Anything 5만 경로 | < 30 ms | **~15 ms** (전: 33) | fzf `fuzzy: 'v1'` |
+| Goto Anything 5만 경로 | < 30 ms | **~15 ms** (전: 33) | fzf `fuzzy: 'v1'`. GitHub Windows 러너는 74 ms(v2: 134) → 이 유닛 테스트만 CI 허용 120 ms |
 | 5만 줄 파일 열기 | < 500 ms | **25 ms** | `openFile` 왕복(IPC 읽기 + 상태 생성) |
 
 수치 파일: `test-results/perf-{startup,memory,typing,openLarge}.json`, `test-results/perf-index.json`.
