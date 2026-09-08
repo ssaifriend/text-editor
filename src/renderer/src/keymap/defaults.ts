@@ -5,6 +5,7 @@ const editor = (keys: string, command: string): Binding => ({ keys, command, whe
 
 const common: readonly Binding[] = [
   { keys: 'mod+n', command: 'file.new' },
+  { keys: 'mod+shift+n', command: 'window.new' },
   { keys: 'mod+o', command: 'file.open' },
   { keys: 'mod+s', command: 'file.save' },
   { keys: 'mod+shift+s', command: 'file.saveAs' },
@@ -18,6 +19,10 @@ const common: readonly Binding[] = [
   { keys: 'ctrl+3', command: 'view.focusPane', args: 3 },
   { keys: 'ctrl+4', command: 'view.focusPane', args: 4 },
   { keys: 'ctrl+tab', command: 'tab.next' },
+  { keys: 'ctrl+`', command: 'terminal.new' },
+  { keys: 'mod+k mod+b', command: 'sidebar.toggle' },
+  { keys: 'mod+alt+enter', command: 'terminal.sendSelection' },
+  { keys: 'mod+alt+shift+enter', command: 'terminal.sendAtPath' },
   { keys: 'ctrl+shift+tab', command: 'tab.prev' },
   editor('mod+/', 'editor.toggleComment'),
   editor('mod+shift+d', 'editor.duplicateLine'),

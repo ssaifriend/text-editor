@@ -1,8 +1,11 @@
+import { indentUnit } from '@codemirror/language'
+import { EditorState } from '@codemirror/state'
 import type { Accessor } from 'solid-js'
 import type { Workspace } from './app/workspace'
 import type { CommandRegistry } from './commands/registry'
 import type { WhenContext } from './commands/when'
-import type { FileMeta } from './editor/buffers'
+import type { CompiledBinding } from './keymap/bindings'
+import { type FileMeta, type Format, isDirty } from './editor/buffers'
 import { whenContext } from './app/context'
 import { leaves } from './ui/layout/paneTree'
 
@@ -24,6 +27,18 @@ export type MoruTestHooks = {
   openPath(path: string): Promise<boolean>
   paletteOpen(): boolean
   context(): WhenContext
+  editorSettings(): { tabSize: number; indentUnit: string; lineNumbers: boolean; wordWrap: boolean }
+  ready(): boolean
+  format(): Format | null
+  dirty(): boolean
+  bindingFor(commandId: string): string | null
+  terminals(): { id: string; title: string; alive: boolean; exitCode: number | null }[]
+  terminalText(): string
+  terminalFocus(): void
+  setSelection(from: number, to: number): void
+  projectRoot(): string | null
+  bannerKind(): string | null
+  windowId(): string
 }
 
 declare global {
@@ -32,7 +47,13 @@ declare global {
   }
 }
 
-export const installTestHooks = (ws: Workspace, registry: CommandRegistry, paletteOpen: Accessor<boolean>): void => {
+export const installTestHooks = (
+  ws: Workspace,
+  registry: CommandRegistry,
+  paletteOpen: Accessor<boolean>,
+  ready: Accessor<boolean>,
+  bindings: Accessor<readonly CompiledBinding[]>,
+): void => {
   const view = () => {
     const v = ws.activeView()
     if (!v) throw new Error('no active editor view')
@@ -55,10 +76,16 @@ export const installTestHooks = (ws: Workspace, registry: CommandRegistry, palet
         active: leaf.id === ws.state.activePane,
         tabs: leaf.tabs.map((tabId) => {
           const tab = ws.state.tabs[tabId]
-          const meta = tab ? ws.state.buffers[tab.bufferId] : undefined
+          const meta = tab?.kind === 'buffer' ? ws.state.buffers[tab.bufferId] : undefined
+          const title =
+            tab?.kind === 'terminal'
+              ? (ws.state.terminals[tab.ptyId]?.title ?? 'Terminal')
+              : tab?.kind === 'diff'
+                ? tab.title
+                : (meta?.title ?? '')
           return {
             path: meta?.path ?? null,
-            title: meta?.title ?? '',
+            title,
             dirty: meta?.dirty ?? false,
             active: leaf.active === tabId,
           }
@@ -68,5 +95,42 @@ export const installTestHooks = (ws: Workspace, registry: CommandRegistry, palet
     openPath: (path) => ws.openFile(path),
     paletteOpen,
     context: () => whenContext(ws, { paletteOpen: paletteOpen() }),
+    editorSettings: () => {
+      const v = view()
+      return {
+        tabSize: v.state.facet(EditorState.tabSize),
+        indentUnit: v.state.facet(indentUnit),
+        lineNumbers: v.dom.querySelector('.cm-gutters') !== null,
+        wordWrap: v.contentDOM.classList.contains('cm-lineWrapping'),
+      }
+    },
+    ready,
+    format: () => ws.activeBuffer()?.format ?? null,
+    dirty: () => {
+      const b = ws.activeBuffer()
+      return b ? isDirty(b) : false
+    },
+    bindingFor: (commandId) => [...bindings()].reverse().find((b) => b.command === commandId)?.keys ?? null,
+    terminals: () => Object.values(ws.state.terminals).map((t) => ({ id: t.id, title: t.title, alive: t.alive, exitCode: t.exitCode })),
+    terminalText: () => {
+      const id = ws.activeTerminalId() ?? Object.keys(ws.state.terminals).at(-1)
+      const entry = id ? ws.terminalRegistry.get(id) : null
+      if (!entry) return ''
+      const buffer = entry.term.buffer.active
+      const lines = Array.from({ length: buffer.length }, (_, y) => buffer.getLine(y)?.translateToString(true) ?? '')
+      return lines.join('\n').replace(/\s+$/, '')
+    },
+    terminalFocus: () => {
+      const id = ws.activeTerminalId() ?? Object.keys(ws.state.terminals).at(-1)
+      const entry = id ? ws.terminalRegistry.get(id) : null
+      entry?.term.focus()
+    },
+    setSelection: (from, to) => view().dispatch({ selection: { anchor: from, head: to } }),
+    projectRoot: () => ws.state.projectRoot,
+    windowId: () => ws.state.windowId,
+    bannerKind: () => {
+      const b = ws.activeBuffer()
+      return b ? (ws.state.banners[b.id]?.kind ?? null) : null
+    },
   }
 }

@@ -8,7 +8,7 @@ export type PaletteProps = {
   readonly open: Accessor<boolean>
   readonly onClose: () => void
   readonly registry: CommandRegistry
-  readonly bindings: readonly CompiledBinding[]
+  readonly bindings: Accessor<readonly CompiledBinding[]>
   readonly platform: Platform
 }
 
@@ -23,7 +23,7 @@ export const CommandPalette = (props: PaletteProps) => {
   let input: HTMLInputElement | undefined
 
   const keyLabel = (commandId: string): string => {
-    const binding = props.bindings.find((b) => b.command === commandId)
+    const binding = [...props.bindings()].reverse().find((b) => b.command === commandId)
     return binding ? formatKeys(binding.chord, props.platform) : ''
   }
 

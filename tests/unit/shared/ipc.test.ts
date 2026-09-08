@@ -16,6 +16,25 @@ describe('ipc contracts', () => {
     expect(pushContracts['command.run'].safeParse({ id: 'tab.select', args: 2 }).success).toBe(true)
   })
 
+  it('keymap.get and keymap.changed carry a snapshot', () => {
+    const snap = { bindings: [{ keys: 'mod+1', command: 'tab.select', args: 1 }], error: null }
+    expect(contracts['keymap.get'].response.safeParse({ ok: true, value: snap }).success).toBe(true)
+    expect(pushContracts['keymap.changed'].safeParse(snap).success).toBe(true)
+  })
+
+  it('pty contracts', () => {
+    expect(contracts['pty.spawn'].request.safeParse({ cwd: null, cols: 80, rows: 24 }).success).toBe(true)
+    expect(contracts['pty.spawn'].response.safeParse({ ok: true, value: { id: 'pty1', pid: 42, cwd: '/x' } }).success).toBe(true)
+    expect(pushContracts['pty.data'].safeParse({ id: 'pty1', data: 'hi' }).success).toBe(true)
+    expect(pushContracts['pty.exit'].safeParse({ id: 'pty1', exitCode: 0 }).success).toBe(true)
+  })
+
+  it('watch contracts', () => {
+    expect(contracts['fs.watch'].request.safeParse({ path: '/a' }).success).toBe(true)
+    expect(pushContracts['fs.changed'].safeParse({ path: '/a', hash: 'h', mtimeMs: 1 }).success).toBe(true)
+    expect(pushContracts['fs.deleted'].safeParse({ path: '/a' }).success).toBe(true)
+  })
+
   it('every push channel has a push contract', () => {
     expect(Object.keys(pushContracts).sort()).toEqual([...pushChannels].sort())
   })
@@ -63,8 +82,8 @@ describe('ipc contracts', () => {
 
   it('app.bootstrap response carries paths and test flag', () => {
     const schema = contracts['app.bootstrap'].response
-    expect(schema.safeParse({ ok: true, value: { paths: [], test: true } }).success).toBe(true)
-    expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], test: false } }).success).toBe(true)
-    expect(schema.safeParse({ ok: true, value: { path: null, test: true } }).success).toBe(false)
+    expect(schema.safeParse({ ok: true, value: { paths: [], projectRoot: null, windowId: 'w1', test: true } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { paths: ['/x.md'], projectRoot: '/x', windowId: 'w1', test: false } }).success).toBe(true)
+    expect(schema.safeParse({ ok: true, value: { paths: [], test: true } }).success).toBe(false)
   })
 })

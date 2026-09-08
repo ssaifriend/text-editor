@@ -3,10 +3,13 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
-export type Launched = { readonly app: ElectronApplication; readonly page: Page }
+export type Launched = { readonly app: ElectronApplication; readonly page: Page; readonly userData: string }
 
-export const launchApp = async (env: Record<string, string> = {}): Promise<Launched> => {
-  const userData = mkdtempSync(join(tmpdir(), 'moru-e2e-'))
+export const launchApp = async (
+  env: Record<string, string> = {},
+  options: { readonly userData?: string } = {},
+): Promise<Launched> => {
+  const userData = options.userData ?? mkdtempSync(join(tmpdir(), 'moru-e2e-'))
 
   const app = await electron.launch({
     args: [resolve('out/main/index.js')],
@@ -15,6 +18,7 @@ export const launchApp = async (env: Record<string, string> = {}): Promise<Launc
 
   const page = await app.firstWindow()
   await page.waitForSelector('#root')
+  await page.waitForFunction(() => window.__moruTest?.ready() === true)
 
-  return { app, page }
+  return { app, page, userData }
 }

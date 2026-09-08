@@ -20,7 +20,7 @@ export const EditorHost = (props: Props) => {
         () => {
           const leaf = props.leaf()
           const tab = leaf.active ? props.ws.state.tabs[leaf.active] : undefined
-          return tab?.bufferId ?? null
+          return tab?.kind === 'buffer' ? tab.bufferId : null
         },
         (bufferId) => {
           const buffer = bufferId ? props.ws.getBuffer(bufferId) : null

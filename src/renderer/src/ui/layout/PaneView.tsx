@@ -1,22 +1,54 @@
 import { For, Show } from 'solid-js'
 import type { Workspace } from '../../app/workspace'
+import { Banner } from '../banner/Banner'
 import { EditorHost } from '../editor/EditorHost'
 import { TabStrip } from '../tabs/TabStrip'
+import { TerminalHost } from '../terminal/TerminalHost'
+import { DiffHost } from '../diff/DiffHost'
+import { themeById } from '../../theme/themes'
 import type { PaneLeaf, PaneNode, PaneSplit } from './paneTree'
 import { SplitGutter } from './SplitGutter'
 
 type Props = { readonly ws: Workspace; readonly node: () => PaneNode }
 
-const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => (
-  <div
-    class="pane"
-    classList={{ active: props.ws.state.activePane === props.leaf().id }}
-    data-pane-id={props.leaf().id}
-  >
-    <TabStrip ws={props.ws} leaf={props.leaf} />
-    <EditorHost ws={props.ws} leaf={props.leaf} />
-  </div>
-)
+const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
+  const activeTab = () => {
+    const active = props.leaf().active
+    return active ? props.ws.state.tabs[active] : undefined
+  }
+  const terminalId = (): string | null => {
+    const tab = activeTab()
+    return tab?.kind === 'terminal' ? tab.ptyId : null
+  }
+  const diffTab = () => {
+    const tab = activeTab()
+    return tab?.kind === 'diff' ? tab : null
+  }
+
+  return (
+    <div
+      class="pane"
+      classList={{ active: props.ws.state.activePane === props.leaf().id }}
+      data-pane-id={props.leaf().id}
+    >
+      <TabStrip ws={props.ws} leaf={props.leaf} />
+      <Banner ws={props.ws} leaf={props.leaf} />
+      <div class="editor-host-wrap" classList={{ hidden: terminalId() !== null || diffTab() !== null }}>
+        <EditorHost ws={props.ws} leaf={props.leaf} />
+      </div>
+      <Show when={terminalId()}>{(id) => <TerminalHost ws={props.ws} leaf={props.leaf} ptyId={id} />}</Show>
+      <Show when={diffTab()}>
+        {(tab) => (
+          <DiffHost
+            diskText={tab().diskText}
+            bufferText={tab().bufferText}
+            theme={themeById(props.ws.settings().theme).editor}
+          />
+        )}
+      </Show>
+    </div>
+  )
+}
 
 const SplitView = (props: { ws: Workspace; split: () => PaneSplit }) => {
   let container!: HTMLDivElement

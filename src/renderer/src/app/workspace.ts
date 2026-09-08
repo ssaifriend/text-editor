@@ -1,14 +1,37 @@
-import type { EditorState } from '@codemirror/state'
+import { indentUnit } from '@codemirror/language'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { A, D, R, pipe } from '@mobily/ts-belt'
-import { createSignal } from 'solid-js'
+import { createSignal, type Accessor } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import type { OpenedFile, SaveError } from '@shared/ipc'
-import { type Buffer, type BufferId, type FileMeta, createBuffer, isDirty, markSaved, titleOf } from '../editor/buffers'
+import { type Settings, resolveForLanguage } from '@shared/config'
+import type { EncodingName, Eol } from '@shared/encoding'
+import type { DirtyEntry, OpenedFile, SaveError, TreeEntry } from '@shared/ipc'
+import {
+  type Buffer,
+  type BufferId,
+  type FileMeta,
+  type Format,
+  createBuffer,
+  isDirty,
+  markSaved,
+  metaOfFile,
+  replaceContents,
+  titleOf,
+  withFormat,
+  withLanguage,
+} from '../editor/buffers'
 import { baseExtensions, makeState } from '../editor/createEditor'
 import { cursorPosition, type CursorPosition } from '../editor/cursor'
+import { configExtensions, cssFontFamily, settingsCompartment } from '../editor/editorConfig'
+import { changeSetFromDiff, externalChangeAnnotation } from '../editor/externalChange'
+import { themeCompartment } from '../theme/apply'
+import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
-import { invoke } from '../ipc'
+import { invoke, on } from '../ipc'
+import { type TerminalRegistry, createTerminalRegistry } from '../terminal/registry'
+import { xtermTheme } from '../terminal/theme'
+import type { DirtySync } from './dirtySync'
 import {
   addTab,
   closeLeaf,
@@ -28,30 +51,67 @@ import {
   type TabId,
 } from '../ui/layout/paneTree'
 
-export type Tab = { readonly id: TabId; readonly kind: 'buffer'; readonly bufferId: BufferId }
+export type Tab =
+  | { readonly id: TabId; readonly kind: 'buffer'; readonly bufferId: BufferId }
+  | { readonly id: TabId; readonly kind: 'terminal'; readonly ptyId: string }
+  | { readonly id: TabId; readonly kind: 'diff'; readonly bufferId: BufferId; readonly diskText: string; readonly bufferText: string; readonly title: string }
+
+export type TerminalMeta = {
+  readonly id: string
+  readonly title: string
+  readonly alive: boolean
+  readonly exitCode: number | null
+  readonly cwd: string
+}
 export type BufferMeta = {
   readonly id: BufferId
   readonly path: string | null
   readonly title: string
   readonly dirty: boolean
   readonly languageId: string
+  readonly tabSize: number
+  readonly insertSpaces: boolean
+  readonly encoding: EncodingName
+  readonly bom: boolean
+  readonly eol: Eol
 }
 export type CloseChoice = 'save' | 'dontSave' | 'cancel'
 export type SaveMode = 'normal' | 'overwrite'
+export type Banner =
+  | { readonly kind: 'conflict'; readonly diskHash: string }
+  | { readonly kind: 'encodingLossy'; readonly positions: readonly number[] }
+  | { readonly kind: 'readonly' }
+  | { readonly kind: 'external'; readonly diskHash: string }
+  | { readonly kind: 'deleted' }
 
 export type WorkspaceState = {
   tabs: Record<TabId, Tab>
   buffers: Record<BufferId, BufferMeta>
+  banners: Record<BufferId, Banner>
+  terminals: Record<string, TerminalMeta>
+  projectRoot: string | null
+  windowId: string
+  sidebar: { open: boolean; expanded: Record<string, true>; entries: Record<string, TreeEntry[]> }
   activePane: PaneId
   editorFocused: boolean
+  terminalFocused: boolean
   cursor: CursorPosition
   status: string
 }
 
 export type Workspace = {
   readonly state: WorkspaceState
+  readonly settings: Accessor<Settings>
   readonly tree: () => PaneNode
   readonly setEditorFocus: (paneId: PaneId, focused: boolean) => void
+  readonly setTerminalFocus: (paneId: PaneId, focused: boolean) => void
+  readonly terminalRegistry: TerminalRegistry
+  readonly newTerminal: () => Promise<string | null>
+  readonly restartTerminal: (ptyId: string) => Promise<void>
+  readonly restartActiveTerminal: () => Promise<void>
+  readonly sendToTerminal: (text: string) => Promise<void>
+  readonly activeTerminalId: () => string | null
+  readonly relativePath: (path: string) => string
   readonly getBuffer: (id: BufferId) => Buffer | null
   readonly activeLeaf: () => PaneLeaf
   readonly activeBuffer: () => Buffer | null
@@ -73,20 +133,46 @@ export type Workspace = {
   readonly save: (mode?: SaveMode) => Promise<void>
   readonly saveAs: () => Promise<void>
   readonly setStatus: (text: string) => void
+  readonly applySettings: (next: Settings) => void
+  readonly setEol: (eol: Eol) => void
+  readonly setEncoding: (encoding: EncodingName, bom: boolean) => void
+  readonly reinterpret: (encoding: EncodingName) => Promise<void>
+  readonly setLanguage: (languageId: string) => void
+  readonly setIndent: (tabSize: number, insertSpaces: boolean) => void
+  readonly dismissBanner: (bufferId: BufferId) => void
+  readonly reload: () => Promise<void>
+  readonly saveAsUtf8: () => Promise<void>
+  readonly restoreDirty: () => Promise<void>
+  readonly keepMine: () => void
+  readonly compareWithDisk: () => Promise<void>
+  readonly recreateDeleted: () => Promise<void>
+  readonly setProjectRoot: (root: string | null) => Promise<void>
+  readonly setWindowId: (id: string) => void
+  readonly toggleSidebar: () => void
+  readonly expandDir: (dir: string) => Promise<void>
+  readonly collapseDir: (dir: string) => void
+  readonly refreshDir: (dir: string) => Promise<void>
+  readonly createFileIn: (dir: string, name: string) => Promise<void>
+  readonly renameEntry: (path: string, name: string) => Promise<void>
+  readonly deleteEntry: (path: string) => Promise<void>
 }
 
-type Deps = { readonly confirmClose: (title: string) => Promise<CloseChoice> }
+type Deps = {
+  readonly confirmClose: (title: string) => Promise<CloseChoice>
+  readonly settings: Accessor<Settings>
+  readonly dirtySync: DirtySync
+}
 
-const describeSaveError = (error: SaveError): string => {
+const bannerFor = (error: SaveError): Banner | null => {
   switch (error.kind) {
     case 'conflict':
-      return 'conflict: file changed on disk (use overwrite to replace it)'
+      return { kind: 'conflict', diskHash: error.diskHash }
     case 'encodingLossy':
-      return `encoding cannot represent ${error.positions.length} character(s); save as UTF-8?`
+      return { kind: 'encodingLossy', positions: error.positions }
     case 'readonly':
-      return `read-only: ${error.message}`
+      return { kind: 'readonly' }
     default:
-      return `save failed: ${error.message}`
+      return null
   }
 }
 
@@ -96,10 +182,31 @@ const metaOf = (buffer: Buffer): BufferMeta => ({
   title: titleOf(buffer),
   dirty: isDirty(buffer),
   languageId: buffer.languageId,
+  tabSize: buffer.state.facet(EditorState.tabSize),
+  insertSpaces: buffer.state.facet(indentUnit) !== '\t',
+  encoding: buffer.format.encoding,
+  bom: buffer.format.bom,
+  eol: buffer.format.eol,
 })
 
 const sameMeta = (a: BufferMeta | undefined, b: BufferMeta): boolean =>
-  a !== undefined && a.dirty === b.dirty && a.title === b.title && a.path === b.path && a.languageId === b.languageId
+  a !== undefined &&
+  a.dirty === b.dirty &&
+  a.title === b.title &&
+  a.path === b.path &&
+  a.languageId === b.languageId &&
+  a.tabSize === b.tabSize &&
+  a.insertSpaces === b.insertSpaces &&
+  a.encoding === b.encoding &&
+  a.bom === b.bom &&
+  a.eol === b.eol
+
+const indentOverride = new Compartment()
+
+const indentExtension = (tabSize: number, insertSpaces: boolean): Extension => [
+  EditorState.tabSize.of(tabSize),
+  indentUnit.of(insertSpaces ? ' '.repeat(tabSize) : '\t'),
+]
 
 const counter = (prefix: string) => {
   let n = 0
@@ -109,7 +216,7 @@ const counter = (prefix: string) => {
 const appendAll = (tree: PaneNode, tabIds: readonly TabId[], toPaneId: PaneId): PaneNode =>
   tabIds.reduce((t, tabId) => moveTab(t, tabId, toPaneId, findLeaf(t, toPaneId)?.tabs.length ?? 0), tree)
 
-export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
+export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Workspace => {
   const nextBufferId = counter('b')
   const nextTabId = counter('t')
   const nextPaneId = counter('p')
@@ -118,8 +225,14 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
   const [state, setState] = createStore<WorkspaceState>({
     tabs: {},
     buffers: {},
+    banners: {},
+    terminals: {},
+    projectRoot: null,
+    windowId: 'unknown',
+    sidebar: { open: true, expanded: {}, entries: {} },
     activePane: firstPane,
     editorFocused: false,
+    terminalFocused: false,
     cursor: { line: 1, col: 1 },
     status: '',
   })
@@ -148,34 +261,101 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
       (found) => (found ? found[0] : null),
     )
 
-  const bufferInPane = (paneId: PaneId): Buffer | null => {
+  const activeTabOf = (paneId: PaneId): Tab | undefined => {
     const leaf = findLeaf(currentTree, paneId)
-    const tab = leaf?.active ? state.tabs[leaf.active] : undefined
-    return tab ? (buffers[tab.bufferId] ?? null) : null
+    return leaf?.active ? state.tabs[leaf.active] : undefined
   }
 
+  const bufferInPane = (paneId: PaneId): Buffer | null => {
+    const tab = activeTabOf(paneId)
+    return tab?.kind === 'buffer' ? (buffers[tab.bufferId] ?? null) : null
+  }
+
+  const dirtyEntry = (buffer: Buffer): DirtyEntry => ({
+    id: `${state.windowId}:${buffer.id}`,
+    path: buffer.meta?.path ?? null,
+    text: buffer.state.doc.toString(),
+    selection: { anchor: buffer.state.selection.main.anchor, head: buffer.state.selection.main.head },
+  })
+
   const putBuffer = (buffer: Buffer): void => {
+    const prev = buffers[buffer.id]
     buffers = D.set(buffers, buffer.id, buffer)
     const next = metaOf(buffer)
     if (!sameMeta(state.buffers[buffer.id], next)) setState('buffers', buffer.id, next)
+
+    const docChanged = !prev || !prev.state.doc.eq(buffer.state.doc)
+    const dirtyChanged = (prev ? isDirty(prev) : false) !== next.dirty
+    if (docChanged || dirtyChanged) dirtySync.changed(dirtyEntry(buffer), next.dirty)
   }
 
-  const onUpdate = (editorState: EditorState, view: EditorView): void => {
+  const onUpdate = (editorState: EditorState, view: EditorView, external: boolean): void => {
     const paneId = paneOfView(view)
     const buffer = paneId ? bufferInPane(paneId) : null
     if (!buffer || !paneId) return
 
-    putBuffer({ ...buffer, state: editorState })
+    if (!external) putBuffer({ ...buffer, state: editorState })
     if (paneId === state.activePane) setState('cursor', cursorPosition(editorState))
   }
 
   const setEditorFocus = (paneId: PaneId, focused: boolean): void => {
-    if (focused) setState({ activePane: paneId, editorFocused: true })
+    if (focused) setState({ activePane: paneId, editorFocused: true, terminalFocused: false })
     else if (state.activePane === paneId) setState('editorFocused', false)
   }
 
+  const setTerminalFocus = (paneId: PaneId, focused: boolean): void => {
+    if (focused) setState({ activePane: paneId, terminalFocused: true, editorFocused: false })
+    else if (state.activePane === paneId) setState('terminalFocused', false)
+  }
+
   const stateFor = (doc: string, languageId: string): EditorState =>
-    makeState(doc, baseExtensions(languageById(languageId).load(), { onUpdate }))
+    makeState(doc, [
+      baseExtensions(languageById(languageId).load(), { onUpdate }),
+      indentOverride.of([]),
+      settingsCompartment.of(configExtensions(resolveForLanguage(settings(), languageId))),
+      themeCompartment.of(themeById(settings().theme).editor),
+    ])
+
+  const untitledFormat = (): Format => ({
+    encoding: settings().files.defaultEncoding,
+    bom: false,
+    eol: settings().files.defaultEol === 'crlf' ? 'crlf' : 'lf',
+  })
+
+  const viewShowing = (bufferId: BufferId): EditorView | null =>
+    pipe(
+      leaves(currentTree),
+      A.find((leaf) => {
+        const tab = leaf.active ? state.tabs[leaf.active] : undefined
+        return tab?.kind === 'buffer' && tab.bufferId === bufferId
+      }),
+      (leaf) => (leaf ? (views[leaf.id] ?? null) : null),
+    )
+
+  const terminalOptions = (next: Settings = settings()) => ({
+    theme: xtermTheme(themeById(next.theme)),
+    fontFamily: cssFontFamily(next.editor.fontFamily),
+    fontSize: next.editor.fontSize,
+  })
+
+  const applySettings = (next: Settings): void => {
+    const options = terminalOptions(next)
+    terminalRegistry.setTheme(options.theme)
+    terminalRegistry.setFont(options.fontFamily, options.fontSize)
+    D.values(buffers).forEach((buffer) => {
+      const effects = [
+        settingsCompartment.reconfigure(configExtensions(resolveForLanguage(next, buffer.languageId))),
+        themeCompartment.reconfigure(themeById(next.theme).editor),
+      ]
+      const view = viewShowing(buffer.id)
+      if (view) {
+        view.dispatch({ effects })
+        putBuffer({ ...buffer, state: view.state })
+      } else {
+        putBuffer({ ...buffer, state: buffer.state.update({ effects }).state })
+      }
+    })
+  }
 
   const activeLeaf = (): PaneLeaf => findLeaf(tree(), state.activePane) ?? (leaves(tree())[0] as PaneLeaf)
 
@@ -188,15 +368,18 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
     views[paneId]?.focus()
   }
 
-  const addBufferTab = (buffer: Buffer): void => {
-    const tab: Tab = { id: nextTabId(), kind: 'buffer', bufferId: buffer.id }
-    putBuffer(buffer)
+  const addTabToActive = (tab: Tab): void => {
     setState('tabs', tab.id, tab)
     setTree(addTab(currentTree, state.activePane, tab.id))
   }
 
+  const addBufferTab = (buffer: Buffer): void => {
+    putBuffer(buffer)
+    addTabToActive({ id: nextTabId(), kind: 'buffer', bufferId: buffer.id })
+  }
+
   const tabForPath = (path: string): { paneId: PaneId; tabId: TabId } | null => {
-    const tab = D.values(state.tabs).find((t) => buffers[t.bufferId]?.meta?.path === path)
+    const tab = D.values(state.tabs).find((t) => t.kind === 'buffer' && buffers[t.bufferId]?.meta?.path === path)
     const leaf = tab ? leafOfTab(currentTree, tab.id) : null
     return tab && leaf ? { paneId: leaf.id, tabId: tab.id } : null
   }
@@ -213,7 +396,8 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
     return R.match(
       result,
       (file: OpenedFile) => {
-        addBufferTab(createBuffer(nextBufferId(), file, stateFor))
+        addBufferTab(createBuffer(nextBufferId(), file, stateFor, untitledFormat()))
+        void invoke('fs.watch', { path: file.path })
         setState('status', `opened ${file.path}`)
         return true
       },
@@ -224,25 +408,61 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
     )
   }
 
-  const newUntitled = (): void => addBufferTab(createBuffer(nextBufferId(), null, stateFor))
+  const newUntitled = (): void => addBufferTab(createBuffer(nextBufferId(), null, stateFor, untitledFormat()))
+
+  const clearBanner = (bufferId: BufferId): void => {
+    if (state.banners[bufferId]) {
+      setState(
+        produce((s) => {
+          delete s.banners[bufferId]
+        }),
+      )
+    }
+  }
 
   const dropTab = (tabId: TabId): void => {
     const tab = state.tabs[tabId]
     if (!tab) return
+
+    if (tab.kind === 'terminal') {
+      void invoke('pty.kill', { id: tab.ptyId })
+      terminalRegistry.dispose(tab.ptyId)
+      setTree(removeTab(currentTree, tabId))
+      setState(
+        produce((s) => {
+          delete s.tabs[tabId]
+          delete s.terminals[tab.ptyId]
+        }),
+      )
+      return
+    }
+
+    if (tab.kind === 'diff') {
+      setTree(removeTab(currentTree, tabId))
+      setState(
+        produce((s) => {
+          delete s.tabs[tabId]
+        }),
+      )
+      return
+    }
+
+    const buffer = buffers[tab.bufferId]
+    if (buffer) dirtySync.changed(dirtyEntry(buffer), false)
+    if (buffer?.meta) void invoke('fs.unwatch', { path: buffer.meta.path })
     buffers = D.deleteKey(buffers, tab.bufferId)
     setTree(removeTab(currentTree, tabId))
     setState(
       produce((s) => {
         delete s.tabs[tabId]
         delete s.buffers[tab.bufferId]
+        delete s.banners[tab.bufferId]
       }),
     )
   }
 
   const saveBuffer = async (buffer: Buffer, mode: SaveMode, path: string): Promise<boolean> => {
-    const encoding = buffer.meta?.encoding ?? 'utf8'
-    const bom = buffer.meta?.bom ?? false
-    const eol = buffer.meta?.eol ?? 'lf'
+    const { encoding, bom, eol } = buffer.format
 
     const result = await invoke('fs.save', {
       path,
@@ -270,11 +490,14 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
           largeFile: buffer.meta?.largeFile ?? false,
         }
         putBuffer(markSaved(buffers[buffer.id] ?? buffer, meta))
+        clearBanner(buffer.id)
         setState('status', `saved ${saved.bytes} bytes`)
         return true
       },
       (error) => {
-        setState('status', describeSaveError(error))
+        const banner = bannerFor(error)
+        if (banner) setState('banners', buffer.id, banner)
+        else setState('status', `save failed: ${error.message}`)
         return false
       },
     )
@@ -306,8 +529,25 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
   const closeTab = async (tabId?: TabId): Promise<void> => {
     const target = tabId ?? activeLeaf().active
     const tab = target ? state.tabs[target] : undefined
-    const buffer = tab ? buffers[tab.bufferId] : undefined
-    if (!tab || !buffer) return
+    if (!tab) return
+
+    if (tab.kind === 'terminal') {
+      const term = state.terminals[tab.ptyId]
+      if (term?.alive) {
+        const choice = await confirmClose(term.title)
+        if (choice === 'cancel') return
+      }
+      dropTab(tab.id)
+      return
+    }
+
+    if (tab.kind === 'diff') {
+      dropTab(tab.id)
+      return
+    }
+
+    const buffer = buffers[tab.bufferId]
+    if (!buffer) return
 
     if (isDirty(buffer)) {
       const choice = await confirmClose(titleOf(buffer))
@@ -365,6 +605,366 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
     focusView(first.id)
   }
 
+  const updateActive = (f: (buffer: Buffer) => Buffer): void => {
+    const buffer = activeBuffer()
+    if (!buffer) return
+    const next = f(buffer)
+    putBuffer(next)
+    if (next.state !== buffer.state) viewShowing(buffer.id)?.setState(next.state)
+  }
+
+  const setEol = (eol: Eol): void => updateActive((b) => withFormat(b, { eol }))
+
+  const setEncoding = (encoding: EncodingName, bom: boolean): void =>
+    updateActive((b) => withFormat(b, { encoding, bom }))
+
+  const setLanguage = (languageId: string): void => updateActive((b) => withLanguage(b, languageId, stateFor))
+
+  const reinterpret = async (encoding: EncodingName): Promise<void> => {
+    const buffer = activeBuffer()
+    if (!buffer?.meta) return
+    if (isDirty(buffer)) {
+      setState('status', 'reinterpret needs a clean buffer: save or revert first')
+      return
+    }
+
+    const result = await invoke('fs.open', { path: buffer.meta.path, encoding })
+    R.match(
+      result,
+      (file) => updateActive((current) => replaceContents(current, file, stateFor)),
+      (error) => setState('status', `reinterpret failed: ${error.message}`),
+    )
+  }
+
+  const reload = async (): Promise<void> => {
+    const buffer = activeBuffer()
+    if (!buffer?.meta) return
+    const result = await invoke('fs.open', { path: buffer.meta.path })
+    R.match(
+      result,
+      (file) => {
+        updateActive((current) => replaceContents(current, file, stateFor))
+        clearBanner(buffer.id)
+      },
+      (error) => setState('status', `reload failed: ${error.message}`),
+    )
+  }
+
+  const saveAsUtf8 = async (): Promise<void> => {
+    setEncoding('utf8', false)
+    await save('normal')
+  }
+
+  const replaceDocOfActive = (text: string, selection: DirtyEntry['selection']): void => {
+    const buffer = activeBuffer()
+    if (!buffer) return
+    const clamp = (n: number): number => Math.min(n, text.length)
+    const spec = {
+      changes: { from: 0, to: buffer.state.doc.length, insert: text },
+      selection: { anchor: clamp(selection.anchor), head: clamp(selection.head) },
+    }
+    const view = viewShowing(buffer.id)
+    if (view) view.dispatch(spec)
+    else putBuffer({ ...buffer, state: buffer.state.update(spec).state })
+  }
+
+  const restoreDirty = async (): Promise<void> => {
+    const listed = await invoke('dirty.list', undefined)
+    const entries = R.getWithDefault(listed, [] as DirtyEntry[])
+
+    for (const entry of entries) {
+      const opened = entry.path ? await openFile(entry.path) : false
+      if (!opened) newUntitled()
+      replaceDocOfActive(entry.text, entry.selection)
+      await invoke('dirty.clear', entry.id)
+    }
+  }
+
+  const setIndent = (tabSize: number, insertSpaces: boolean): void => {
+    const buffer = activeBuffer()
+    if (!buffer) return
+    const effects = indentOverride.reconfigure(indentExtension(tabSize, insertSpaces))
+    const view = viewShowing(buffer.id)
+    if (view) {
+      view.dispatch({ effects })
+      putBuffer({ ...buffer, state: view.state })
+    } else {
+      putBuffer({ ...buffer, state: buffer.state.update({ effects }).state })
+    }
+  }
+
+  const bufferByPath = (path: string): Buffer | null =>
+    pipe(
+      D.values(buffers),
+      A.find((b) => b.meta?.path === path),
+      (b) => b ?? null,
+    )
+
+  const applySilentReload = (buffer: Buffer, file: OpenedFile): void => {
+    const spec = {
+      changes: changeSetFromDiff(buffer.state.doc.toString(), file.text),
+      annotations: externalChangeAnnotation.of(true),
+    }
+    const view = viewShowing(buffer.id)
+    const nextState = view ? (view.dispatch(spec), view.state) : buffer.state.update(spec).state
+    putBuffer(markSaved({ ...buffer, state: nextState }, metaOfFile(file)))
+    clearBanner(buffer.id)
+  }
+
+  const handleExternalChange = async (path: string): Promise<void> => {
+    const buffer = bufferByPath(path)
+    if (!buffer) return
+
+    const result = await invoke('fs.open', { path })
+    R.tap(result, (file) => {
+      const current = buffers[buffer.id]
+      if (!current) return
+      if (current.meta?.hash === file.hash) return
+      if (isDirty(current)) setState('banners', current.id, { kind: 'external', diskHash: file.hash })
+      else applySilentReload(current, file)
+    })
+  }
+
+  on('fs.changed', ({ path }) => void handleExternalChange(path))
+  on('fs.deleted', ({ path }) => {
+    const buffer = bufferByPath(path)
+    if (buffer) setState('banners', buffer.id, { kind: 'deleted' })
+  })
+
+  const keepMine = (): void => {
+    const buffer = activeBuffer()
+    const banner = buffer ? state.banners[buffer.id] : undefined
+    if (!buffer?.meta || banner?.kind !== 'external') return
+    putBuffer({ ...buffer, meta: { ...buffer.meta, hash: banner.diskHash } })
+    clearBanner(buffer.id)
+  }
+
+  const compareWithDisk = async (): Promise<void> => {
+    const buffer = activeBuffer()
+    if (!buffer?.meta) return
+    const result = await invoke('fs.open', { path: buffer.meta.path })
+    R.tap(result, (file) => {
+      addTabToActive({
+        id: nextTabId(),
+        kind: 'diff',
+        bufferId: buffer.id,
+        diskText: file.text,
+        bufferText: buffer.state.doc.toString(),
+        title: `${titleOf(buffer)} ↔ disk`,
+      })
+    })
+  }
+
+  const recreateDeleted = async (): Promise<void> => {
+    const buffer = activeBuffer()
+    if (!buffer?.meta) return
+    if (await saveBuffer(buffer, 'overwrite', buffer.meta.path)) clearBanner(buffer.id)
+  }
+
+  const dirnameOf = (path: string): string | null => {
+    const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    return index > 0 ? path.slice(0, index) : null
+  }
+
+  const isAbsolutePath = (path: string): boolean => /^([A-Za-z]:[\\/]|\/)/.test(path)
+
+  const joinPath = (base: string, rel: string): string => {
+    const separator = base.includes('\\') ? '\\' : '/'
+    const parts = [...base.split(/[\\/]/), ...rel.split(/[\\/]/)].filter((p) => p !== '' && p !== '.')
+    const resolved = parts.reduce<string[]>((acc, part) => (part === '..' ? acc.slice(0, -1) : [...acc, part]), [])
+    return (base.startsWith('/') ? '/' : '') + resolved.join(separator)
+  }
+
+  const activeTerminalId = (): string | null => {
+    const tab = activeTabOf(state.activePane)
+    return tab?.kind === 'terminal' ? tab.ptyId : null
+  }
+
+  const lastLiveTerminalId = (): string | null =>
+    pipe(
+      D.values(state.terminals),
+      A.filter((t) => t.alive),
+      A.last,
+      (t) => t?.id ?? null,
+    )
+
+  const openPathAt = async (path: string, line?: number, col?: number): Promise<void> => {
+    const cwd = state.terminals[activeTerminalId() ?? lastLiveTerminalId() ?? '']?.cwd
+    const absolute = isAbsolutePath(path) ? path : cwd ? joinPath(cwd, path) : path
+    const opened = await openFile(absolute)
+    const view = activeView()
+    if (!opened || !view || !line) return
+
+    const lineNo = Math.min(Math.max(1, line), view.state.doc.lines)
+    const lineInfo = view.state.doc.line(lineNo)
+    const pos = Math.min(lineInfo.from + Math.max(0, (col ?? 1) - 1), lineInfo.to)
+    view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
+  }
+
+  let terminalCount = 0
+
+  const terminalRegistry = createTerminalRegistry({
+    onInput: (id, data) => void invoke('pty.write', { id, data }),
+    onResize: (id, cols, rows) => void invoke('pty.resize', { id, cols, rows }),
+    onAck: (id, bytes) => window.moru.send('pty.ack', { id, bytes }),
+    openPath: (path, line, col) => void openPathAt(path, line, col),
+    openUrl: (url) => void window.open(url),
+  })
+
+  on('pty.data', ({ id, data }) => terminalRegistry.write(id, data))
+  on('pty.exit', ({ id, exitCode }) => {
+    if (state.terminals[id]) setState('terminals', id, { alive: false, exitCode })
+  })
+
+  const spawnTerminal = async (cwd: string | null): Promise<{ id: string; cwd: string } | null> => {
+    const result = await invoke('pty.spawn', { cwd, cols: 80, rows: 24 })
+    return R.match(
+      result,
+      ({ id, cwd: dir }) => {
+        terminalRegistry.create(id, terminalOptions())
+        return { id, cwd: dir }
+      },
+      (error) => {
+        setState('status', `terminal failed: ${error.message}`)
+        return null
+      },
+    )
+  }
+
+  const newTerminal = async (): Promise<string | null> => {
+    const activePath = activeBuffer()?.meta?.path
+    const spawned = await spawnTerminal(state.projectRoot ?? (activePath ? dirnameOf(activePath) : null))
+    if (!spawned) return null
+
+    terminalCount += 1
+    setState('terminals', spawned.id, {
+      id: spawned.id,
+      title: `Terminal ${terminalCount}`,
+      alive: true,
+      exitCode: null,
+      cwd: spawned.cwd,
+    })
+    addTabToActive({ id: nextTabId(), kind: 'terminal', ptyId: spawned.id })
+    return spawned.id
+  }
+
+  const restartTerminal = async (ptyId: string): Promise<void> => {
+    const old = state.terminals[ptyId]
+    const tab = D.values(state.tabs).find((t) => t.kind === 'terminal' && t.ptyId === ptyId)
+    if (!old || !tab) return
+
+    const spawned = await spawnTerminal(old.cwd)
+    if (!spawned) return
+
+    void invoke('pty.kill', { id: ptyId })
+    terminalRegistry.dispose(ptyId)
+    setState(
+      produce((s) => {
+        delete s.terminals[ptyId]
+        s.terminals[spawned.id] = { id: spawned.id, title: old.title, alive: true, exitCode: null, cwd: spawned.cwd }
+        s.tabs[tab.id] = { id: tab.id, kind: 'terminal', ptyId: spawned.id }
+      }),
+    )
+  }
+
+  const restartActiveTerminal = async (): Promise<void> => {
+    const id = activeTerminalId()
+    if (id) await restartTerminal(id)
+  }
+
+  const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+  const sendToTerminal = async (text: string): Promise<void> => {
+    const existing = activeTerminalId() ?? lastLiveTerminalId()
+    const id = existing ?? (await newTerminal())
+    if (!id) return
+    if (!existing) await sleep(400)
+    await invoke('pty.write', { id, data: text })
+  }
+
+  const relativePath = (path: string): string => {
+    const base = state.projectRoot ?? state.terminals[activeTerminalId() ?? lastLiveTerminalId() ?? '']?.cwd
+    return base && path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path
+  }
+
+  const joinName = (dir: string, name: string): string => `${dir}${dir.includes('\\') ? '\\' : '/'}${name}`
+
+  const refreshDir = async (dir: string): Promise<void> => {
+    const result = await invoke('fs.tree', { dir })
+    R.match(
+      result,
+      (entries) => setState('sidebar', 'entries', dir, entries),
+      (error) => setState('status', `folder failed: ${error.message}`),
+    )
+  }
+
+  const expandDir = async (dir: string): Promise<void> => {
+    setState('sidebar', 'expanded', dir, true)
+    await refreshDir(dir)
+  }
+
+  const collapseDir = (dir: string): void => {
+    setState(
+      produce((s) => {
+        delete s.sidebar.expanded[dir]
+      }),
+    )
+  }
+
+  const setProjectRoot = async (root: string | null): Promise<void> => {
+    setState('projectRoot', root)
+    setState('sidebar', { open: state.sidebar.open, expanded: {}, entries: {} })
+    if (root) await refreshDir(root)
+  }
+
+  const toggleSidebar = (): void => setState('sidebar', 'open', !state.sidebar.open)
+
+  const parentDir = (path: string): string => dirnameOf(path) ?? path
+
+  const createFileIn = async (dir: string, name: string): Promise<void> => {
+    const path = joinName(dir, name)
+    const result = await invoke('fs.create', { path })
+    await R.match(
+      result,
+      async () => {
+        await refreshDir(dir)
+        await openFile(path)
+      },
+      async (error) => setState('status', `create failed: ${error.message}`),
+    )
+  }
+
+  const retargetBuffers = (from: string, to: string): void => {
+    D.values(buffers).forEach((buffer) => {
+      const path = buffer.meta?.path
+      if (!buffer.meta || !path) return
+      if (path === from) putBuffer({ ...buffer, meta: { ...buffer.meta, path: to } })
+      else if (path.startsWith(`${from}/`)) putBuffer({ ...buffer, meta: { ...buffer.meta, path: to + path.slice(from.length) } })
+    })
+  }
+
+  const renameEntry = async (path: string, name: string): Promise<void> => {
+    const to = joinName(parentDir(path), name)
+    const result = await invoke('fs.rename', { from: path, to })
+    await R.match(
+      result,
+      async () => {
+        retargetBuffers(path, to)
+        await refreshDir(parentDir(path))
+      },
+      async (error) => setState('status', `rename failed: ${error.message}`),
+    )
+  }
+
+  const deleteEntry = async (path: string): Promise<void> => {
+    const result = await invoke('fs.delete', { path })
+    await R.match(
+      result,
+      async () => refreshDir(parentDir(path)),
+      async (error) => setState('status', `delete failed: ${error.message}`),
+    )
+  }
+
   const focusPaneIndex = (n: number): void => {
     const leaf = leaves(currentTree)[n - 1]
     if (leaf) focusView(leaf.id)
@@ -372,8 +972,17 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
 
   return {
     state,
+    settings,
     tree,
     setEditorFocus,
+    setTerminalFocus,
+    terminalRegistry,
+    newTerminal,
+    restartTerminal,
+    restartActiveTerminal,
+    sendToTerminal,
+    activeTerminalId,
+    relativePath,
     getBuffer: (id) => buffers[id] ?? null,
     activeLeaf,
     activeBuffer,
@@ -399,5 +1008,27 @@ export const createWorkspace = ({ confirmClose }: Deps): Workspace => {
     save,
     saveAs,
     setStatus: (text) => setState('status', text),
+    applySettings,
+    setEol,
+    setEncoding,
+    reinterpret,
+    setLanguage,
+    setIndent,
+    dismissBanner: clearBanner,
+    reload,
+    saveAsUtf8,
+    restoreDirty,
+    keepMine,
+    compareWithDisk,
+    recreateDeleted,
+    setProjectRoot,
+    setWindowId: (id) => setState('windowId', id),
+    toggleSidebar,
+    expandDir,
+    collapseDir,
+    refreshDir,
+    createFileIn,
+    renameEntry,
+    deleteEntry,
   }
 }

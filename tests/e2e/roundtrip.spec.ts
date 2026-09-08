@@ -64,7 +64,7 @@ test('a file changed on disk is reported as a conflict and not overwritten', asy
   await page.keyboard.type('x')
   await page.evaluate(() => window.__moruTest!.runCommand('file.save'))
 
-  await expect(page.getByTestId('status')).toContainText('conflict')
+  await expect(page.getByTestId('banner')).toContainText('changed on disk')
   expect(readFileSync(path, 'utf8')).toBe('v2 from agent\n')
 
   await page.evaluate(() => window.__moruTest!.saveAs('overwrite'))

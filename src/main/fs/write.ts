@@ -27,7 +27,10 @@ const conflictOf = async ({ path, expectedHash, mode }: SaveRequest): Promise<Sa
   return { kind: 'conflict', message: `${path} changed on disk since it was opened`, diskHash }
 }
 
-export const writeTextFile = async (request: SaveRequest): Promise<IpcResult<SavedMeta, SaveError>> => {
+export const writeTextFile = async (
+  request: SaveRequest,
+  onWritten?: (path: string, hash: string) => void,
+): Promise<IpcResult<SavedMeta, SaveError>> => {
   try {
     const conflict = await conflictOf(request)
     if (conflict) return err(conflict)
@@ -43,13 +46,10 @@ export const writeTextFile = async (request: SaveRequest): Promise<IpcResult<Sav
 
     await writeAtomically(request.path, encoded.bytes)
     const info = await stat(request.path)
+    const hash = hashBytes(encoded.bytes)
+    onWritten?.(request.path, hash)
 
-    return ok({
-      path: request.path,
-      bytes: encoded.bytes.length,
-      hash: hashBytes(encoded.bytes),
-      mtimeMs: info.mtimeMs,
-    })
+    return ok({ path: request.path, bytes: encoded.bytes.length, hash, mtimeMs: info.mtimeMs })
   } catch (e) {
     const kind = codeOf(e) === 'EACCES' || codeOf(e) === 'EPERM' ? 'readonly' : 'io'
     return err({ kind, message: messageOf(e) })
