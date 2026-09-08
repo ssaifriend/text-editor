@@ -76,8 +76,7 @@ test('preview renders sanitized html with local images, updates live, syncs scro
   await expect.poll(() => page.evaluate(() => window.__moruTest!.previewScrollLine())).toBeGreaterThanOrEqual(55)
 
   await run(page, 'markdown.exportHtml')
-  await expect.poll(() => existsSync(out)).toBe(true)
-  expect(readFileSync(out, 'utf8')).toContain('<h1')
+  await expect.poll(() => (existsSync(out) ? readFileSync(out, 'utf8') : '')).toContain('<h1')
   expect(readFileSync(out, 'utf8')).not.toContain('<script')
 
   await page.keyboard.press(`${mod}+Shift+v`)
