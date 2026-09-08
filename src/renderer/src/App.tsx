@@ -40,7 +40,7 @@ export const App = () => {
     R.match(
       result,
       ({ text, ...rest }) => {
-        editor.setDoc(text, languageFor(rest.path))
+        editor.setDoc(text, languageFor(rest.path).load())
         setMeta(rest)
         setStatus(`opened ${rest.path}`)
       },

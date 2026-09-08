@@ -1,14 +1,6 @@
-export type MoruTestHooks = {
-  doc(): string
-  selections(): { from: number; to: number }[]
-  composing(): boolean
-  focus(): void
-  setCursor(pos: number): void
-  setWhitespace(on: boolean): void
-  path(): string | null
-  meta(): unknown
-  saveAs(mode: 'normal' | 'overwrite'): Promise<void>
-}
+import type { MoruTestHooks } from '../../src/renderer/src/testHooks'
+
+export type { MoruTestHooks }
 
 export type MoruMetrics = {
   readyMs: number | null
@@ -19,9 +11,6 @@ export type MoruMetrics = {
 export type PtyProbeResult = { output: string; exitCode: number }
 
 declare global {
-  interface Window {
-    __moruTest?: MoruTestHooks
-  }
   // eslint-disable-next-line no-var
   var __moruMetrics: MoruMetrics | undefined
   // eslint-disable-next-line no-var
