@@ -74,7 +74,7 @@ docs/superpowers/reports/m1a-file-backend.md
 - Produces `src/shared/encoding.ts`: `EncodingName = 'utf8' | 'utf16le' | 'utf16be' | 'cp949' | 'shift_jis' | 'gb18030' | 'latin1'`, `encodingNames: readonly EncodingName[]`, `encodingLabel(name, bom): string`, `Eol = 'lf' | 'crlf' | 'cr'`, `eolNames`, `eolLabel(eol)`, `eolSequence(eol): string`.
 - Produces `src/main/fs/eol.ts`: `detectEol(text: string): { eol: Eol; mixed: boolean }`, `normalizeToLf(text): string`, `restoreEol(text: string, eol: Eol): string`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/main/eol.test.ts`:
 ```ts
@@ -131,12 +131,12 @@ describe('restoreEol', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm add -D fast-check@4.9.0 && pnpm vitest run tests/unit/main/eol.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/shared/encoding.ts`:
 ```ts
@@ -210,12 +210,12 @@ export const restoreEol = (text: string, eol: Eol): string =>
 
 Note on tie-breaking: `A.sortBy` is stable, so with equal counts the order `crlf, lf, cr` decides. The test `a\nb\nc\r\nd` has lf=2, crlf=1 → lf.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `pnpm vitest run tests/unit/main/eol.test.ts`
 Expected: PASS (9 tests incl. property).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml src/shared/encoding.ts src/main/fs/eol.ts tests/unit/main/eol.test.ts
@@ -233,7 +233,7 @@ git commit -m "feat(fs): add encoding vocabulary and EOL detect/normalize/restor
 **Interfaces:**
 - Produces: `Detected = { encoding: EncodingName; bom: boolean; confidence: 'high' | 'low' }`, `detectEncoding(bytes: Buffer): Detected`, `looksLikeCp949(bytes: Buffer): boolean`, `decodeBytes(bytes: Buffer, encoding: EncodingName): string`, `encodeLossless(text: string, encoding: EncodingName, bom: boolean): { ok: true; bytes: Buffer } | { ok: false; positions: number[] }`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/main/encoding.test.ts`:
 ```ts
@@ -321,12 +321,12 @@ describe('encodeLossless', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm add chardet@2.2.0 iconv-lite@0.7.3 && pnpm vitest run tests/unit/main/encoding.test.ts`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/main/fs/encoding.ts`:
 ```ts
@@ -444,12 +444,12 @@ export const encodeLossless = (
 
 `positions` are indexes into `Array.from(text)` (code points), matching how `differingPositions` computes them. `'한 😀 글 🎉'` → code points `한`,` `,`😀`,` `,`글`,` `,`🎉` → unrepresentable at 2 and 6.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Run: `pnpm vitest run tests/unit/main/encoding.test.ts`
 Expected: PASS (13 tests). If the latin1 fallback test returns a different low-confidence encoding for the 4-byte `café`, the assertion on `confidence: 'low'` still holds; adjust the expected encoding only if chardet returns a mapped name — the point of the test is "unknown → safe, low".
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml src/main/fs/encoding.ts tests/unit/main/encoding.test.ts
@@ -471,7 +471,7 @@ git commit -m "feat(fs): detect encoding with BOM, strict utf8, CP949 heuristic,
 - Produces `OpenError = { kind: 'io' | 'binary' | 'unexpected'; message }`.
 - Produces `readTextFile(path: string, forcedEncoding?: EncodingName): Promise<IpcResult<OpenedFile, OpenError>>`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/main/hash.test.ts`:
 ```ts
@@ -608,12 +608,12 @@ and change the `fs.open` request test expectations to use `{ path: '/a.ts' }` ob
   })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm vitest run tests/unit/main/hash.test.ts tests/unit/main/read.test.ts tests/unit/shared/ipc.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/main/fs/hash.ts`:
 ```ts
@@ -722,12 +722,12 @@ Update `src/main/ipc/handlers.ts`: `handle('fs.open', ({ path, encoding }) => re
 
 Update `src/renderer/src/App.tsx` `openPath`: `invoke('fs.open', { path: target })`. (Task 5 finishes the renderer changes; this keeps typecheck green.)
 
-- [ ] **Step 4: Run tests and typecheck**
+- [x] **Step 4: Run tests and typecheck**
 
 Run: `pnpm vitest run tests/unit && pnpm typecheck`
 Expected: unit PASS (the old `tests/unit/main/fs.test.ts` read tests now fail on `toEqual` because the value has more fields — delete `tests/unit/main/fs.test.ts` now; its write tests are superseded in Task 4). Typecheck PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A src/main/fs src/shared/ipc.ts src/main/ipc/handlers.ts src/renderer/src/App.tsx tests/unit
@@ -748,7 +748,7 @@ git commit -m "feat(fs): full read pipeline with encoding, EOL, hash, readonly a
 - Produces `SaveRequest = { path, text, encoding, bom, eol, expectedHash: string | null, mode: 'normal' | 'overwrite' }`, `SavedMeta = { path, bytes: number, hash, mtimeMs }`, `SaveError = io | readonly | conflict { diskHash } | encodingLossy { positions } | unexpected`.
 - Produces `writeTextFile(request: SaveRequest): Promise<IpcResult<SavedMeta, SaveError>>`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/main/write.test.ts`:
 ```ts
@@ -934,12 +934,12 @@ Update `tests/unit/shared/ipc.test.ts` `fs.save request` test:
   })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm vitest run tests/unit/main/write.test.ts tests/unit/shared/ipc.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/main/fs/atomic.ts`:
 ```ts
@@ -1099,12 +1099,12 @@ export const writeTextFile = async (request: SaveRequest): Promise<IpcResult<Sav
 
 `positions` from `encodeLossless` index into the EOL-restored text. For the lossy test the text is `가😀` with `eol: 'lf'` and no newlines, so position 1 is correct. Renderer-side mapping back to document offsets happens in M1b when the banner is built; the M1b plan must convert `restoreEol` offsets → LF offsets (subtract one per preceding `\n` when eol is `crlf`).
 
-- [ ] **Step 4: Run tests and typecheck**
+- [x] **Step 4: Run tests and typecheck**
 
 Run: `pnpm vitest run tests/unit && pnpm typecheck`
 Expected: write PASS (11 tests, 2 skipped on Windows), ipc PASS, typecheck may fail in `App.tsx` on the `fs.save` call shape — fix in Task 5. If it does, proceed to Task 5 before committing, then commit Tasks 4+5 together.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/fs src/shared/ipc.ts tests/unit
@@ -1125,7 +1125,7 @@ git commit -m "feat(fs): atomic save with conflict detection, lossless encoding 
 - Test hook adds `meta(): FileMeta | null` and `saveAs(mode: 'normal' | 'overwrite'): Promise<void>`.
 - Produces E2E `roundtrip.spec.ts` that writes fixtures at test time (cp949+crlf, utf8 BOM+cr, utf16le BOM), opens each, saves unedited, and asserts identical bytes; then edits one and asserts the encoding/EOL are kept.
 
-- [ ] **Step 1: Write the failing E2E**
+- [x] **Step 1: Write the failing E2E**
 
 `tests/e2e/roundtrip.spec.ts`:
 ```ts
@@ -1205,12 +1205,12 @@ test('a file changed on disk is reported as a conflict and not overwritten', asy
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm build && pnpm exec playwright test tests/e2e/roundtrip.spec.ts`
 Expected: FAIL (no `encoding` test id / save request shape).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/renderer/src/App.tsx` (full replacement):
 ```tsx
@@ -1386,12 +1386,12 @@ export const installTestHooks = (editor: Editor, bridges: Bridges): void => {
 
 `tests/e2e/types.d.ts` — add to `MoruTestHooks`: `meta(): unknown`, `saveAs(mode: 'normal' | 'overwrite'): Promise<void>`.
 
-- [ ] **Step 4: Run all E2E and unit**
+- [x] **Step 4: Run all E2E and unit**
 
 Run: `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test`
 Expected: all PASS (roundtrip 5 new tests + existing 9).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/renderer/src tests/e2e
@@ -1414,7 +1414,7 @@ git commit -m "feat(app): save with original encoding/eol, surface conflicts and
 - Renderer gains `on<C extends PushChannel>(channel: C, handler: (payload: PushPayload<C>) => void): () => void` — parses with the push schema, ignores (and logs) malformed payloads.
 - Main gains `pushToAll(channel: PushChannel, payload: PushPayload<C>): void` → `BrowserWindow.getAllWindows().forEach(w => w.webContents.send(channel, payload))`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add to `tests/unit/shared/ipc.test.ts`:
 ```ts
@@ -1449,12 +1449,12 @@ describe('renderer on', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm vitest run tests/unit/shared/ipc.test.ts tests/unit/renderer/ipc.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/shared/channels.ts` (full):
 ```ts
@@ -1555,12 +1555,12 @@ export const pushToAll = <C extends PushChannel>(channel: C, payload: PushPayloa
 }
 ```
 
-- [ ] **Step 4: Run tests, typecheck, build**
+- [x] **Step 4: Run tests, typecheck, build**
 
 Run: `pnpm vitest run tests/unit && pnpm typecheck && pnpm build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/shared src/preload src/renderer/src/ipc.ts src/main/ipc/push.ts tests/unit
@@ -1580,7 +1580,7 @@ git commit -m "feat(ipc): add allowlisted push channels from main to renderer"
 - `src/shared/config.ts`: `EditorSettings`, `Settings` (zod schemas + inferred types), `defaultSettings: Settings`, `parseSettingsText(text: string): { ok: true; settings: Settings } | { ok: false; message: string }`, `resolveForLanguage(settings: Settings, languageId: string): EditorSettings`, `ConfigSnapshot = { settings: Settings; error: string | null }`.
 - `src/main/config/service.ts`: `createConfigService(userData: string, onChange: (snap: ConfigSnapshot) => void): Promise<{ snapshot(): ConfigSnapshot; dispose(): void }>` — ensures `settings.json` exists (writes `defaultFileText`), loads, watches the directory with `fs.watch` (100 ms debounce, filter by filename), keeps last good settings on parse errors.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/shared/config.test.ts`:
 ```ts
@@ -1637,12 +1637,12 @@ describe('resolveForLanguage', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm add jsonc-parser@3.3.1 && pnpm vitest run tests/unit/shared/config.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/shared/config.ts`:
 ```ts
@@ -1841,12 +1841,12 @@ export const registerHandlers = ({ config }: HandlerDeps): void => {
 ```
 (make the `then` callback `async`). Add imports for `createConfigService` and `pushToAll`.
 
-- [ ] **Step 4: Run tests, typecheck, build, e2e smoke**
+- [x] **Step 4: Run tests, typecheck, build, e2e smoke**
 
 Run: `pnpm vitest run tests/unit && pnpm typecheck && pnpm build && pnpm exec playwright test tests/e2e/smoke.spec.ts`
 Expected: PASS; after the smoke run, the temp userData dir contains `settings.json`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml src/shared/config.ts src/shared/ipc.ts src/main/config src/main/ipc src/main/index.ts tests/unit/shared/config.test.ts
@@ -1867,7 +1867,7 @@ git commit -m "feat(config): JSONC settings with zod schema, defaults file, per-
 - `createDirtyStore(userData: string, windowId = 'main')` → `{ write(entry: DirtyEntry): Promise<void>; clear(id: string): Promise<void>; list(): Promise<DirtyEntry[]> }`. Files at `userData/dirty/<windowId>/<id>.json`, written atomically (tmp+rename), corrupt files skipped and kept.
 - Contracts: `dirty.write` request `DirtyEntry` → `null`; `dirty.clear` request `string` → `null`; `dirty.list` → `DirtyEntry[]`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 `tests/unit/main/dirtyStore.test.ts`:
 ```ts
@@ -1920,12 +1920,12 @@ describe('dirty store', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify it fails**
+- [x] **Step 2: Run to verify it fails**
 
 Run: `pnpm vitest run tests/unit/main/dirtyStore.test.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/main/session/dirtyStore.ts`:
 ```ts
@@ -2013,12 +2013,12 @@ export type DirtyEntry = z.infer<typeof DirtyEntry>
 ```
 `src/main/index.ts`: `const dirty = createDirtyStore(app.getPath('userData'))` and pass `{ config, dirty }`.
 
-- [ ] **Step 4: Run tests, typecheck, build**
+- [x] **Step 4: Run tests, typecheck, build**
 
 Run: `pnpm vitest run tests/unit && pnpm typecheck && pnpm build`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/main/session src/shared/ipc.ts src/main/ipc src/main/index.ts tests/unit/main/dirtyStore.test.ts
@@ -2038,7 +2038,7 @@ git commit -m "feat(session): add atomic dirty store with corrupt-file isolation
 - `src/main/log.ts`: `initLogging(userData: string, level: LogLevel): void`, `logger` (`debug/info/warn/error(message: string, meta?: unknown)`), `registerLogChannel(): void` (validates `{ level, message, meta? }` from `log.write`), `installCrashHooks(onRendererGone: () => void): void`.
 - `Bootstrap = { paths: string[]; test: boolean }` — `paths` = `MORU_TEST_OPEN` (if set) plus existing files from `process.argv`.
 
-- [ ] **Step 1: Write the failing E2E**
+- [x] **Step 1: Write the failing E2E**
 
 `tests/e2e/log.spec.ts`:
 ```ts
@@ -2068,12 +2068,12 @@ Update `tests/unit/shared/ipc.test.ts` bootstrap test:
   })
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [x] **Step 2: Run to verify they fail**
 
 Run: `pnpm add electron-log@5.4.4 && pnpm vitest run tests/unit/shared/ipc.test.ts; pnpm build && pnpm exec playwright test tests/e2e/log.spec.ts`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `src/main/log.ts`:
 ```ts
@@ -2216,12 +2216,12 @@ declare global {
 
 `src/renderer/src/App.tsx` bootstrap tap: `R.tap(bootstrap, ({ paths, test }) => { if (test) installTestHooks(...); const last = paths.at(-1); if (last) void openPath(last) })`.
 
-- [ ] **Step 4: Run everything**
+- [x] **Step 4: Run everything**
 
 Run: `pnpm typecheck && pnpm test && pnpm build && pnpm exec playwright test`
 Expected: PASS (log spec + all previous).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add package.json pnpm-lock.yaml src/main src/shared/ipc.ts src/renderer/src/App.tsx tests
@@ -2236,7 +2236,7 @@ git commit -m "feat(main): file logging with renderer log channel, crash hooks, 
 - Create: `docs/superpowers/reports/m1a-file-backend.md`
 - Modify: tick checkboxes in this plan
 
-- [ ] **Step 1: Run the full check and write the report**
+- [x] **Step 1: Run the full check and write the report**
 
 Run: `pnpm check`
 
@@ -2273,7 +2273,7 @@ Run: `pnpm check`
 - 버퍼 레지스트리, 탭/pane, 커맨드/키맵/팔레트, 상태바 클릭 메뉴(재해석·EOL 변경), 테마, dirty store 디바운스 쓰기와 시작 시 복원, 설정 → CM6 Compartment 반영.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add docs/superpowers
