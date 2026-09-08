@@ -1,0 +1,44 @@
+:root {
+  --bg: #1e2227;
+  --fg: #d5dae0;
+  --bar: #2b3038;
+  --font-mono: "D2Coding", "Sarasa Mono K", ui-monospace, Menlo, Consolas, monospace;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.toolbar, .statusbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--bar);
+  flex: 0 0 auto;
+}
+
+.editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.cm-editor {
+  height: 100%;
+}
+
+.cm-scroller {
+  font-family: var(--font-mono);
+}
