@@ -23,7 +23,7 @@ const parseEntry = (text: string): DirtyEntry | null => {
 
 export const createDirtyStore = (userData: string, windowId = 'main'): DirtyStore => {
   const dir = join(userData, 'dirty', windowId)
-  const fileFor = (id: string): string => join(dir, `${id}.json`)
+  const fileFor = (id: string): string => join(dir, `${encodeURIComponent(id)}.json`)
 
   const write = async (entry: DirtyEntry): Promise<void> => {
     await mkdir(dir, { recursive: true })

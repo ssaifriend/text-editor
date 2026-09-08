@@ -5,6 +5,7 @@ import { delimiter, join } from 'node:path'
 import { launchApp } from './launch'
 
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+const tabKey = process.platform === 'darwin' ? 'Meta' : 'Alt'
 const tabs = (page: Page) => page.evaluate(() => window.__moruTest!.tabs())
 
 const twoFiles = () => {
@@ -32,18 +33,18 @@ test('switching tabs keeps each buffer text, dirty flag and undo history', async
   const { app, page } = await launchApp({ MORU_TEST_OPEN: both })
   await expect.poll(async () => (await tabs(page))[0]?.tabs.length).toBe(2)
 
-  await page.keyboard.press(`${mod}+1`)
+  await page.keyboard.press(`${tabKey}+1`)
   await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('const a = 1\n')
   await page.evaluate(() => window.__moruTest!.focus())
   await page.evaluate(() => window.__moruTest!.setCursor(0))
   await page.keyboard.type('// x ')
   await expect.poll(async () => (await tabs(page))[0]?.tabs[0]?.dirty).toBe(true)
 
-  await page.keyboard.press(`${mod}+2`)
+  await page.keyboard.press(`${tabKey}+2`)
   await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('# b\n')
   expect((await tabs(page))[0]?.tabs[1]?.dirty).toBe(false)
 
-  await page.keyboard.press(`${mod}+1`)
+  await page.keyboard.press(`${tabKey}+1`)
   await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('// x const a = 1\n')
   await page.evaluate(() => window.__moruTest!.focus())
   await page.keyboard.press(`${mod}+z`)

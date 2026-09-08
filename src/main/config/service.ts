@@ -1,5 +1,5 @@
 import { watch, type FSWatcher } from 'node:fs'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { type ConfigSnapshot, defaultSettings, parseSettingsText } from '@shared/config'
 import { type KeymapSnapshot, type UserBinding, parseKeymapText } from '@shared/keymapFile'
@@ -11,6 +11,7 @@ export type FileService<T> = { readonly snapshot: () => Snapshot<T>; readonly di
 export type Parsed<T> = { ok: true; value: T } | { ok: false; message: string }
 
 const debounceMs = 100
+const pollMs = 1000
 
 const codeOf = (e: unknown): string | undefined => (e as { code?: string })?.code
 
@@ -59,10 +60,19 @@ export const createJsonFileService = async <T>(
     if (filename === fileName) reload()
   })
 
+  let lastSeen = await stat(path).then((s) => s.mtimeMs, () => 0)
+  const poll = setInterval(async () => {
+    const mtimeMs = await stat(path).then((s) => s.mtimeMs, () => lastSeen)
+    if (mtimeMs === lastSeen) return
+    lastSeen = mtimeMs
+    reload()
+  }, pollMs)
+
   return {
     snapshot: () => current,
     dispose: () => {
       if (timer) clearTimeout(timer)
+      clearInterval(poll)
       watcher.close()
     },
   }

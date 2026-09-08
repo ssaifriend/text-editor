@@ -41,9 +41,12 @@ const realDirOf = async (path: string): Promise<string> => {
 
 const basenameOf = (path: string): string => path.slice(Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
 
+const canonical = (path: string): string => (process.platform === 'win32' ? path.replace(/\\/g, '/').toLowerCase() : path)
+
 export const createWatchService = ({ subscribe, push, expected, delayMs = 100 }: Deps): WatchService => {
   let watched: Record<string, string> = {}
   let realOf: Record<string, string> = {}
+  let dirOf: Record<string, string> = {}
   let dirs: Record<string, DirEntry> = {}
 
   const settle = async (realPath: string): Promise<void> => {
@@ -63,15 +66,16 @@ export const createWatchService = ({ subscribe, push, expected, delayMs = 100 }:
 
   const onEvents = (err: Error | null, events: Event[]): void => {
     if (err) return
-    events.filter((event) => watched[event.path] !== undefined).forEach((event) => coalescer.touch(event.path))
+    events.map((event) => canonical(event.path)).filter((key) => watched[key] !== undefined).forEach((key) => coalescer.touch(key))
   }
 
   const watch = async (path: string): Promise<void> => {
     if (realOf[path]) return
     const dir = await realDirOf(path)
-    const realPath = `${dir}/${basenameOf(path)}`
+    const realPath = canonical(`${dir}/${basenameOf(path)}`)
     watched = { ...watched, [realPath]: path }
     realOf = { ...realOf, [path]: realPath }
+    dirOf = { ...dirOf, [path]: dir }
 
     const existing = dirs[dir]
     if (existing) {
@@ -89,8 +93,10 @@ export const createWatchService = ({ subscribe, push, expected, delayMs = 100 }:
     watched = restWatched
     const { [path]: _gone, ...restReal } = realOf
     realOf = restReal
+    const dir = dirOf[path] ?? dirname(realPath)
+    const { [path]: _dir, ...restDirOf } = dirOf
+    dirOf = restDirOf
 
-    const dir = dirname(realPath)
     const entry = dirs[dir]
     if (!entry) return
     if (entry.count > 1) {
@@ -111,6 +117,7 @@ export const createWatchService = ({ subscribe, push, expected, delayMs = 100 }:
       dirs = {}
       watched = {}
       realOf = {}
+      dirOf = {}
     },
   }
 }

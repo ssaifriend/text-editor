@@ -67,7 +67,8 @@ export const Palette = (props: PaletteProps) => {
 
   const relOf = (path: string): string => {
     const root = props.ws.state.projectRoot
-    return root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : basenameOf(path)
+    const under = root !== null && path.startsWith(root) && /[\\/]/.test(path.charAt(root.length))
+    return under ? path.slice(root.length + 1).replace(/\\/g, '/') : basenameOf(path)
   }
 
   const parsed = createMemo((): GotoQuery => parseGotoQuery(query()))

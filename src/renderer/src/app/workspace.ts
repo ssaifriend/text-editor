@@ -973,7 +973,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
   const relativePath = (path: string): string => {
     const base = state.projectRoot ?? state.terminals[activeTerminalId() ?? lastLiveTerminalId() ?? '']?.cwd
-    return base && path.startsWith(`${base}/`) ? path.slice(base.length + 1) : path
+    return base && path.startsWith(base) && /[\\/]/.test(path.charAt(base.length)) ? path.slice(base.length + 1) : path
   }
 
   const joinName = (dir: string, name: string): string => `${dir}${dir.includes('\\') ? '\\' : '/'}${name}`
@@ -1028,7 +1028,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       const path = buffer.meta?.path
       if (!buffer.meta || !path) return
       if (path === from) putBuffer({ ...buffer, meta: { ...buffer.meta, path: to } })
-      else if (path.startsWith(`${from}/`)) putBuffer({ ...buffer, meta: { ...buffer.meta, path: to + path.slice(from.length) } })
+      else if (path.startsWith(from) && /[\\/]/.test(path.charAt(from.length))) putBuffer({ ...buffer, meta: { ...buffer.meta, path: to + path.slice(from.length) } })
     })
   }
 

@@ -40,11 +40,11 @@ test('new file, rename and delete refresh the tree and keep buffers consistent',
   expect(existsSync(join(root, 'notes.md'))).toBe(true)
   await expect.poll(() => page.evaluate(() => window.__moruTest!.path())).toBe(join(root, 'notes.md'))
 
-  await page.evaluate((r) => window.__moruTest!.runCommand('sidebar.rename', { path: `${r}/notes.md`, name: 'todo.md' }), root)
+  await page.evaluate((r) => window.__moruTest!.runCommand('sidebar.rename', { path: r, name: 'todo.md' }), join(root, 'notes.md'))
   await expect(page.getByTestId('tree-row').filter({ hasText: 'todo.md' })).toHaveCount(1)
   await expect.poll(() => page.evaluate(() => window.__moruTest!.path())).toBe(join(root, 'todo.md'))
 
-  await page.evaluate((r) => window.__moruTest!.runCommand('sidebar.delete', { path: `${r}/README.md` }), root)
+  await page.evaluate((r) => window.__moruTest!.runCommand('sidebar.delete', { path: r }), join(root, 'README.md'))
   await expect(page.getByTestId('tree-row').filter({ hasText: 'README.md' })).toHaveCount(0)
   expect(existsSync(join(root, 'README.md'))).toBe(false)
   await app.close()
