@@ -5,6 +5,7 @@ import { whenContext } from './app/context'
 import { registerAppCommands } from './app/registerCommands'
 import { createDirtySync } from './app/dirtySync'
 import { createSettings } from './app/settings'
+import { installSessionSync } from './app/sessionSync'
 import { installKeymap } from './app/useKeymap'
 import { createWorkspace, type CloseChoice } from './app/workspace'
 import { createCommandRegistry } from './commands/registry'
@@ -76,7 +77,13 @@ export const App = () => {
     requestAnimationFrame(() => window.moru.send(channels.perfFirstPaint, undefined))
 
     const bootstrap = await invoke('app.bootstrap', undefined)
-    const boot = R.getWithDefault(bootstrap, { paths: [] as string[], projectRoot: null as string | null, windowId: 'main', test: false })
+    const boot = R.getWithDefault(bootstrap, {
+      paths: [] as string[],
+      projectRoot: null as string | null,
+      windowId: 'main',
+      session: null,
+      test: false,
+    })
     if (boot.test) installTestHooks(ws, registry, paletteOpen, ready, bindings)
 
     await settingsStore.load()
@@ -91,11 +98,17 @@ export const App = () => {
     window.addEventListener('beforeunload', () => void dirtySync.flush())
 
     ws.setWindowId(boot.windowId)
-    await ws.setProjectRoot(boot.projectRoot)
-    await ws.restoreDirty()
+    await ws.setProjectRoot(boot.session?.projectRoot ?? boot.projectRoot)
+    if (boot.session) {
+      const listed = await invoke('dirty.list', undefined)
+      await ws.restoreSession(boot.session, R.getWithDefault(listed, []))
+    } else {
+      await ws.restoreDirty()
+    }
     for (const path of boot.paths) await ws.openFile(path)
     if (boot.paths.length === 0 && ws.activeLeaf().tabs.length === 0) ws.newUntitled()
     ws.activeView()?.focus()
+    installSessionSync(ws, { send: (snapshot) => window.moru.send('session.save', snapshot) })
     setReady(true)
   })
 

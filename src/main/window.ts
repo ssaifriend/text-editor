@@ -4,10 +4,11 @@ import { is } from '@electron-toolkit/utils'
 
 const hidden = process.env['MORU_HIDDEN'] === '1'
 
-export const createWindow = (): BrowserWindow => {
+export type WindowBounds = { readonly x: number; readonly y: number; readonly width: number; readonly height: number }
+
+export const createWindow = (bounds: WindowBounds | null = null): BrowserWindow => {
   const window = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    ...(bounds ?? { width: 1200, height: 800 }),
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

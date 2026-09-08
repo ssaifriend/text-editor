@@ -78,7 +78,7 @@ export const moveTab = (tree: PaneNode, tabId: TabId, toPaneId: PaneId, index: n
 
 const evenSizes = (n: number): readonly number[] => Array.from({ length: n }, () => 1 / n)
 
-const normalize = (sizes: readonly number[]): readonly number[] => {
+export const normalize = (sizes: readonly number[]): readonly number[] => {
   const total = sizes.reduce((a, b) => a + b, 0)
   return total === 0 ? evenSizes(sizes.length) : sizes.map((s) => s / total)
 }

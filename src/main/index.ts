@@ -2,10 +2,11 @@ import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
 import { delimiter, resolve } from 'node:path'
 import watcher from '@parcel/watcher'
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { A, pipe } from '@mobily/ts-belt'
 import { channels } from '@shared/channels'
+import type { Bounds, WindowSnapshot } from '@shared/session'
 import { createConfigService, createKeymapService } from './config/service'
 import { registerHandlers } from './ipc/handlers'
 import { pushToAll } from './ipc/push'
@@ -16,6 +17,7 @@ import { defaultShell, resolveShellEnv } from './pty/env'
 import { createPtyManager } from './pty/manager'
 import { probePty } from './pty/probe'
 import { createDirtyStore } from './session/dirtyStore'
+import { createSessionStore } from './session/sessionStore'
 import { createExpectedWrites } from './watch/expected'
 import { createWatchService } from './watch/service'
 import { createWindow } from './window'
@@ -23,6 +25,7 @@ import { createWindowRegistry, pushTo } from './windows'
 
 const isTest = process.env['MORU_TEST'] === '1'
 const hidden = process.env['MORU_HIDDEN'] === '1'
+let quitConfirmed = false
 
 const userDataOverride = process.env['MORU_USER_DATA']
 if (userDataOverride) app.setPath('userData', userDataOverride)
@@ -78,13 +81,25 @@ app.whenReady().then(async () => {
     void watch.dispose()
   })
   const windows = createWindowRegistry()
+  const sessionStore = createSessionStore(userData)
 
-  const openWindow = (paths: readonly string[], projectRoot: string | null): BrowserWindow => {
-    const window = createWindow()
-    const info = windows.add({ window, startupPaths: paths, projectRoot })
+  let quitting = false
+  app.on('before-quit', () => {
+    quitting = true
+  })
+
+  const openWindow = (
+    paths: readonly string[],
+    projectRoot: string | null,
+    session: WindowSnapshot | null = null,
+    bounds: Bounds | null = null,
+  ): BrowserWindow => {
+    const window = createWindow(bounds)
+    const info = windows.add({ window, startupPaths: paths, projectRoot, session })
     window.on('closed', () => {
       ptyManager.killOwnedBy(window.webContents)
       windows.remove(info.windowId)
+      if (!quitting) sessionStore.remove(info.windowId)
     })
     return window
   }
@@ -99,15 +114,46 @@ app.whenReady().then(async () => {
     home: app.getPath('home'),
     windows,
     openWindow: (projectRoot) => void openWindow([], projectRoot),
+    session: sessionStore,
   })
   registerLogChannel()
   installMenu()
   ipcMain.on(channels.perfFirstPaint, markFirstPaint)
   if (isTest) exposeTestGlobals()
 
-  const window = openWindow(startupPaths(), startupRoot())
-  window.webContents.on('did-finish-load', markDidFinishLoad)
-  installCrashHooks(() => window.webContents.reload())
+  const savedSession = await sessionStore.load()
+  const saved = savedSession?.windows ?? []
+  const first =
+    saved.length === 0
+      ? openWindow(startupPaths(), startupRoot())
+      : (saved.map((w, i) =>
+          openWindow(
+            i === 0 ? startupPaths() : [],
+            i === 0 ? (startupRoot() ?? w.snapshot.projectRoot) : w.snapshot.projectRoot,
+            w.snapshot,
+            w.bounds,
+          ),
+        )[0] as BrowserWindow)
+  await sessionStore.markCleanExit(false)
+  first.webContents.on('did-finish-load', markDidFinishLoad)
+  installCrashHooks(() => first.webContents.reload())
+
+  app.on('before-quit', (event) => {
+    const hotExit = config.snapshot().settings.files.hotExit
+    if (!hotExit && !quitConfirmed) {
+      event.preventDefault()
+      void dirty.list().then((entries) => {
+        if (entries.length === 0 || dialog.showMessageBoxSync({ type: 'warning', message: 'Quit without saving?', buttons: ['Quit', 'Cancel'], cancelId: 1 }) === 0) {
+          quitConfirmed = true
+          app.quit()
+        } else {
+          quitting = false
+        }
+      })
+      return
+    }
+    void sessionStore.markCleanExit(true)
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openWindow([], startupRoot())

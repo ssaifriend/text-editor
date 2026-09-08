@@ -13,7 +13,16 @@ export const EditorHost = (props: Props) => {
 
   onMount(() => {
     const view = createView(host, emptyState())
-    props.ws.registerView(props.leaf().id, view)
+
+    createEffect(
+      on(
+        () => props.leaf().id,
+        (id, prev) => {
+          if (prev !== undefined && prev !== id) props.ws.unregisterView(prev)
+          props.ws.registerView(id, view)
+        },
+      ),
+    )
 
     createEffect(
       on(

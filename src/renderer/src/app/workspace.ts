@@ -1,3 +1,4 @@
+import { historyField } from '@codemirror/commands'
 import { indentUnit } from '@codemirror/language'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
@@ -6,7 +7,9 @@ import { createSignal, type Accessor } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { type Settings, resolveForLanguage } from '@shared/config'
 import type { EncodingName, Eol } from '@shared/encoding'
+import { fnv1a32 } from '@shared/hash'
 import type { DirtyEntry, OpenedFile, SaveError, TreeEntry } from '@shared/ipc'
+import type { BufferTabSnapshot, LeafSnapshot, PaneSnapshot, TabSnapshot, WindowSnapshot } from '@shared/session'
 import {
   type Buffer,
   type BufferId,
@@ -40,6 +43,7 @@ import {
   leafOfTab,
   leaves,
   moveTab,
+  normalize,
   type PaneId,
   type PaneLeaf,
   type PaneNode,
@@ -148,6 +152,8 @@ export type Workspace = {
   readonly recreateDeleted: () => Promise<void>
   readonly setProjectRoot: (root: string | null) => Promise<void>
   readonly setWindowId: (id: string) => void
+  readonly snapshot: () => WindowSnapshot
+  readonly restoreSession: (snapshot: WindowSnapshot, dirtyEntries: readonly DirtyEntry[]) => Promise<void>
   readonly toggleSidebar: () => void
   readonly expandDir: (dir: string) => Promise<void>
   readonly collapseDir: (dir: string) => void
@@ -308,13 +314,14 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     else if (state.activePane === paneId) setState('terminalFocused', false)
   }
 
-  const stateFor = (doc: string, languageId: string): EditorState =>
-    makeState(doc, [
-      baseExtensions(languageById(languageId).load(), { onUpdate }),
-      indentOverride.of([]),
-      settingsCompartment.of(configExtensions(resolveForLanguage(settings(), languageId))),
-      themeCompartment.of(themeById(settings().theme).editor),
-    ])
+  const extensionsFor = (languageId: string): Extension => [
+    baseExtensions(languageById(languageId).load(), { onUpdate }),
+    indentOverride.of([]),
+    settingsCompartment.of(configExtensions(resolveForLanguage(settings(), languageId))),
+    themeCompartment.of(themeById(settings().theme).editor),
+  ]
+
+  const stateFor = (doc: string, languageId: string): EditorState => makeState(doc, extensionsFor(languageId))
 
   const untitledFormat = (): Format => ({
     encoding: settings().files.defaultEncoding,
@@ -965,6 +972,156 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     )
   }
 
+  const historyLimitChars = 1_000_000
+
+  const bufferSnapshot = (buffer: Buffer): BufferTabSnapshot => {
+    const doc = buffer.state.doc.toString()
+    const json = doc.length <= historyLimitChars ? (buffer.state.toJSON({ history: historyField }) as { history?: unknown }) : {}
+    return {
+      kind: 'buffer',
+      path: buffer.meta?.path ?? null,
+      dirtyId: `${state.windowId}:${buffer.id}`,
+      format: buffer.format,
+      hash: buffer.meta?.hash ?? null,
+      docHash: fnv1a32(doc),
+      selection: { anchor: buffer.state.selection.main.anchor, head: buffer.state.selection.main.head },
+      scrollTop: viewShowing(buffer.id)?.scrollDOM.scrollTop ?? 0,
+      history: json.history ?? null,
+      languageId: buffer.languageId,
+    }
+  }
+
+  const tabSnapshot = (tabId: TabId): TabSnapshot | null => {
+    const tab = state.tabs[tabId]
+    if (!tab) return null
+    if (tab.kind === 'buffer') {
+      const buffer = buffers[tab.bufferId]
+      return buffer ? bufferSnapshot(buffer) : null
+    }
+    if (tab.kind === 'terminal') {
+      const term = state.terminals[tab.ptyId]
+      return term ? { kind: 'terminal', cwd: term.cwd, title: term.title } : null
+    }
+    return null
+  }
+
+  const paneSnapshot = (node: PaneNode): PaneSnapshot => {
+    if (node.kind === 'split') {
+      return { kind: 'split', direction: node.direction, sizes: [...node.sizes], children: node.children.map(paneSnapshot) }
+    }
+    const kept = node.tabs.map((id) => ({ id, snap: tabSnapshot(id) })).filter((t) => t.snap !== null)
+    const activeIndex = kept.findIndex((t) => t.id === node.active)
+    return { kind: 'leaf', tabs: kept.map((t) => t.snap as TabSnapshot), active: activeIndex >= 0 ? activeIndex : kept.length > 0 ? 0 : null }
+  }
+
+  const pathToLeaf = (node: PaneNode, paneId: PaneId): number[] | null => {
+    if (node.kind === 'leaf') return node.id === paneId ? [] : null
+    for (const [i, child] of node.children.entries()) {
+      const sub = pathToLeaf(child, paneId)
+      if (sub) return [i, ...sub]
+    }
+    return null
+  }
+
+  const snapshot = (): WindowSnapshot => ({
+    windowId: state.windowId,
+    projectRoot: state.projectRoot,
+    sidebar: { open: state.sidebar.open, expanded: Object.keys(state.sidebar.expanded) },
+    layout: paneSnapshot(currentTree),
+    activePath: pathToLeaf(currentTree, state.activePane) ?? [],
+  })
+
+  const treeFromSnapshot = (snap: PaneSnapshot): { tree: PaneNode; leaves: { id: PaneId; snap: LeafSnapshot }[] } => {
+    if (snap.kind === 'leaf') {
+      const id = nextPaneId()
+      return { tree: createLeaf(id), leaves: [{ id, snap }] }
+    }
+    const children = snap.children.map(treeFromSnapshot)
+    const sizes = children.length === snap.sizes.length ? normalize(snap.sizes) : normalize(children.map(() => 1))
+    return {
+      tree: { kind: 'split', id: `split:${nextPaneId()}`, direction: snap.direction, children: children.map((c) => c.tree), sizes },
+      leaves: children.flatMap((c) => c.leaves),
+    }
+  }
+
+  const stateFromSnapshot = (text: string, languageId: string, snap: BufferTabSnapshot): EditorState => {
+    const useHistory = snap.history !== null && fnv1a32(text) === snap.docHash
+    const clamp = (n: number): number => Math.min(n, text.length)
+    const json = {
+      doc: text,
+      selection: { ranges: [{ anchor: clamp(snap.selection.anchor), head: clamp(snap.selection.head) }], main: 0 },
+      ...(useHistory ? { history: snap.history } : {}),
+    }
+    return EditorState.fromJSON(json, { extensions: extensionsFor(languageId) }, useHistory ? { history: historyField } : {})
+  }
+
+  const restoreBufferTab = async (snap: BufferTabSnapshot, dirty: DirtyEntry | undefined): Promise<void> => {
+    if (snap.path === null) {
+      if (!dirty) return
+      const buffer = createBuffer(nextBufferId(), null, stateFor, untitledFormat())
+      addBufferTab({ ...buffer, state: stateFromSnapshot(dirty.text, 'plain', snap) })
+      return
+    }
+
+    const result = await invoke('fs.open', { path: snap.path })
+    await R.match(
+      result,
+      async (file) => {
+        const text = dirty?.text ?? file.text
+        const base = createBuffer(nextBufferId(), file, stateFor, untitledFormat())
+        const restored: Buffer = { ...base, state: stateFromSnapshot(text, base.languageId, snap), format: snap.format }
+        addBufferTab(restored)
+        void invoke('fs.watch', { path: file.path })
+        if (dirty && snap.hash !== null && snap.hash !== file.hash) setState('banners', restored.id, { kind: 'external', diskHash: file.hash })
+      },
+      async () => {
+        if (!dirty) return
+        const buffer = createBuffer(nextBufferId(), null, stateFor, untitledFormat())
+        addBufferTab({ ...buffer, state: stateFromSnapshot(dirty.text, 'plain', snap) })
+      },
+    )
+  }
+
+  const restoreTerminalTab = async (snap: { cwd: string; title: string }): Promise<void> => {
+    const spawned = await spawnTerminal(snap.cwd)
+    if (!spawned) return
+    terminalCount += 1
+    setState('terminals', spawned.id, { id: spawned.id, title: snap.title, alive: true, exitCode: null, cwd: spawned.cwd })
+    addTabToActive({ id: nextTabId(), kind: 'terminal', ptyId: spawned.id })
+  }
+
+  const restoreSession = async (snap: WindowSnapshot, dirtyEntries: readonly DirtyEntry[]): Promise<void> => {
+    const dirtyById = Object.fromEntries(dirtyEntries.map((e) => [e.id, e]))
+    const { tree: built, leaves: leafSnaps } = treeFromSnapshot(snap.layout)
+    setTree(built)
+
+    for (const leaf of leafSnaps) {
+      setState('activePane', leaf.id)
+      for (const tabSnap of leaf.snap.tabs) {
+        if (tabSnap.kind === 'buffer') await restoreBufferTab(tabSnap, dirtyById[tabSnap.dirtyId])
+        else await restoreTerminalTab(tabSnap)
+      }
+      const restoredLeaf = findLeaf(currentTree, leaf.id)
+      const activeTab = restoredLeaf && leaf.snap.active !== null ? restoredLeaf.tabs[leaf.snap.active] : undefined
+      if (restoredLeaf && activeTab) setTree(setActiveTab(currentTree, leaf.id, activeTab))
+    }
+
+    for (const entry of dirtyEntries) await invoke('dirty.clear', entry.id)
+
+    setState('sidebar', 'open', snap.sidebar.open)
+    for (const dir of snap.sidebar.expanded) await expandDir(dir)
+
+    const targetLeaf = leafAtPath(currentTree, snap.activePath) ?? leaves(currentTree)[0]
+    if (targetLeaf) focusView(targetLeaf.id)
+  }
+
+  const leafAtPath = (node: PaneNode, path: readonly number[]): PaneLeaf | null => {
+    if (node.kind === 'leaf') return path.length === 0 ? node : null
+    const [head, ...rest] = path
+    const child = head === undefined ? undefined : node.children[head]
+    return child ? leafAtPath(child, rest) : null
+  }
+
   const focusPaneIndex = (n: number): void => {
     const leaf = leaves(currentTree)[n - 1]
     if (leaf) focusView(leaf.id)
@@ -1023,6 +1180,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     recreateDeleted,
     setProjectRoot,
     setWindowId: (id) => setState('windowId', id),
+    snapshot,
+    restoreSession,
     toggleSidebar,
     expandDir,
     collapseDir,

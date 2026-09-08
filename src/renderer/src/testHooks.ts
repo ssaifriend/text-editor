@@ -39,6 +39,8 @@ export type MoruTestHooks = {
   projectRoot(): string | null
   bannerKind(): string | null
   windowId(): string
+  snapshotNow(): unknown
+  scrollTop(): number
 }
 
 declare global {
@@ -128,6 +130,8 @@ export const installTestHooks = (
     setSelection: (from, to) => view().dispatch({ selection: { anchor: from, head: to } }),
     projectRoot: () => ws.state.projectRoot,
     windowId: () => ws.state.windowId,
+    snapshotNow: () => ws.snapshot(),
+    scrollTop: () => view().scrollDOM.scrollTop,
     bannerKind: () => {
       const b = ws.activeBuffer()
       return b ? (ws.state.banners[b.id]?.kind ?? null) : null
