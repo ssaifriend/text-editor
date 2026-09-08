@@ -2,6 +2,8 @@ import { join } from 'node:path'
 import { BrowserWindow, shell } from 'electron'
 import { is } from '@electron-toolkit/utils'
 
+const hidden = process.env['MORU_HIDDEN'] === '1'
+
 export const createWindow = (): BrowserWindow => {
   const window = new BrowserWindow({
     width: 1200,
@@ -15,7 +17,9 @@ export const createWindow = (): BrowserWindow => {
     },
   })
 
-  window.on('ready-to-show', () => window.show())
+  window.on('ready-to-show', () => {
+    if (!hidden) window.show()
+  })
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)

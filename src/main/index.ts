@@ -7,6 +7,7 @@ import { probePty } from './pty/probe'
 import { createWindow } from './window'
 
 const isTest = process.env['MORU_TEST'] === '1'
+const hidden = process.env['MORU_HIDDEN'] === '1'
 
 const userDataOverride = process.env['MORU_USER_DATA']
 if (userDataOverride) app.setPath('userData', userDataOverride)
@@ -18,6 +19,7 @@ const exposeTestGlobals = (): void => {
 
 app.whenReady().then(() => {
   markReady()
+  if (hidden) app.dock?.hide()
   electronApp.setAppUserModelId('kr.moru.app')
   app.on('browser-window-created', (_event, window) => optimizer.watchWindowShortcuts(window))
 

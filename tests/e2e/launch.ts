@@ -10,7 +10,7 @@ export const launchApp = async (env: Record<string, string> = {}): Promise<Launc
 
   const app = await electron.launch({
     args: [resolve('out/main/index.js')],
-    env: { ...process.env, MORU_TEST: '1', MORU_USER_DATA: userData, ...env },
+    env: { ...process.env, MORU_TEST: '1', MORU_HIDDEN: '1', MORU_USER_DATA: userData, ...env },
   })
 
   const page = await app.firstWindow()
