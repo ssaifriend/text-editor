@@ -16,8 +16,8 @@ import {
   undo,
   undoSelection,
 } from '@codemirror/commands'
-import { selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
-import { EditorSelection } from '@codemirror/state'
+import { SearchCursor, selectNextOccurrence, selectSelectionMatches } from '@codemirror/search'
+import { EditorSelection, type EditorState, type SelectionRange } from '@codemirror/state'
 import type { Command, EditorView } from '@codemirror/view'
 
 export type EditorCommandSpec = { readonly id: string; readonly title: string; readonly run: Command }
@@ -34,7 +34,74 @@ const insertLineBefore: Command = (view: EditorView) => {
   return true
 }
 
+const splitSelectionIntoLines: Command = (view) => {
+  const { state } = view
+  const ranges = state.selection.ranges.flatMap((range) => {
+    if (range.empty) return [range]
+    const first = state.doc.lineAt(range.from).number
+    const last = state.doc.lineAt(range.to).number
+    return Array.from({ length: last - first + 1 }, (_, i) => {
+      const line = state.doc.line(first + i)
+      return EditorSelection.cursor(i === last - first ? Math.min(line.to, range.to) : line.to)
+    })
+  })
+  view.dispatch({ selection: EditorSelection.create(ranges, ranges.length - 1) })
+  return true
+}
+
+const addCursor =
+  (delta: 1 | -1): Command =>
+  (view) => {
+    const { state } = view
+    const existing = state.selection.ranges.map((r) => r.head)
+    const added = state.selection.ranges.flatMap((range) => {
+      const line = state.doc.lineAt(range.head)
+      const target = line.number + delta
+      if (target < 1 || target > state.doc.lines) return []
+      const goal = range.goalColumn ?? range.head - line.from
+      const next = state.doc.line(target)
+      const pos = Math.min(next.from + goal, next.to)
+      return existing.includes(pos) ? [] : [EditorSelection.cursor(pos, undefined, undefined, goal)]
+    })
+    if (added.length === 0) return false
+
+    const all = [...state.selection.ranges, ...added]
+    view.dispatch({ selection: EditorSelection.create(all, all.length - 1) })
+    return true
+  }
+
+const nextOccurrenceAfter = (state: EditorState, text: string, from: number, taken: readonly SelectionRange[]): SelectionRange | null => {
+  const isTaken = (start: number): boolean => taken.some((r) => r.from === start)
+  const search = (start: number, end: number): SelectionRange | null => {
+    const cursor = new SearchCursor(state.doc, text, start, end)
+    while (!cursor.next().done) {
+      if (!isTaken(cursor.value.from)) return EditorSelection.range(cursor.value.from, cursor.value.to)
+    }
+    return null
+  }
+  return search(from, state.doc.length) ?? search(0, from)
+}
+
+const skipOccurrence: Command = (view) => {
+  const { state } = view
+  const main = state.selection.main
+  if (main.empty) return selectNextOccurrence(view)
+
+  const rest = state.selection.ranges.filter((r) => r !== main)
+  const text = state.sliceDoc(main.from, main.to)
+  const next = nextOccurrenceAfter(state, text, main.to, state.selection.ranges)
+  const ranges = next ? [...rest, next] : rest
+  if (ranges.length === 0) return false
+
+  view.dispatch({ selection: EditorSelection.create(ranges, ranges.length - 1), scrollIntoView: true })
+  return true
+}
+
 export const editorCommands: readonly EditorCommandSpec[] = [
+  { id: 'editor.splitSelectionIntoLines', title: 'Split Selection into Lines', run: splitSelectionIntoLines },
+  { id: 'editor.addCursorAbove', title: 'Add Cursor Above', run: addCursor(-1) },
+  { id: 'editor.addCursorBelow', title: 'Add Cursor Below', run: addCursor(1) },
+  { id: 'editor.skipOccurrence', title: 'Quick Skip Next', run: skipOccurrence },
   { id: 'editor.toggleComment', title: 'Toggle Comment', run: toggleComment },
   { id: 'editor.duplicateLine', title: 'Duplicate Line', run: copyLineDown },
   { id: 'editor.deleteLine', title: 'Delete Line', run: deleteLine },

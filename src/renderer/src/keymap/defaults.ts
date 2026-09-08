@@ -33,6 +33,8 @@ const common: readonly Binding[] = [
   editor('mod+]', 'editor.indentMore'),
   editor('mod+[', 'editor.indentLess'),
   editor('mod+d', 'editor.selectNextOccurrence'),
+  editor('mod+shift+l', 'editor.splitSelectionIntoLines'),
+  editor('mod+k mod+d', 'editor.skipOccurrence'),
   editor('mod+u', 'editor.undoSelection'),
   editor('mod+shift+u', 'editor.redoSelection'),
   editor('ctrl+m', 'editor.matchingBracket'),
@@ -48,6 +50,8 @@ const mac: readonly Binding[] = [
   ...tabSelect('mod'),
   editor('ctrl+mod+arrowup', 'editor.moveLineUp'),
   editor('ctrl+mod+arrowdown', 'editor.moveLineDown'),
+  editor('ctrl+shift+arrowup', 'editor.addCursorAbove'),
+  editor('ctrl+shift+arrowdown', 'editor.addCursorBelow'),
   editor('ctrl+mod+g', 'editor.selectAllOccurrences'),
 ]
 
@@ -55,6 +59,8 @@ const win: readonly Binding[] = [
   ...tabSelect('alt'),
   editor('ctrl+shift+arrowup', 'editor.moveLineUp'),
   editor('ctrl+shift+arrowdown', 'editor.moveLineDown'),
+  editor('ctrl+alt+arrowup', 'editor.addCursorAbove'),
+  editor('ctrl+alt+arrowdown', 'editor.addCursorBelow'),
   editor('alt+f3', 'editor.selectAllOccurrences'),
   editor('ctrl+y', 'editor.redo'),
 ]
