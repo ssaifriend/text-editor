@@ -7,7 +7,7 @@ const opts = { encoding: 'auto', maxFileSizeMb: 10, exclude: ['**/dist/**'] }
 describe('rgArgs', () => {
   it('builds literal, smart flags and globs', () => {
     expect(rgArgs(spec, ['/r'], opts)).toEqual([
-      '--json', '--hidden', '--glob', '!.git/**', '--glob', '!**/dist/**', '--max-filesize', '10M', '-i', '-F', '-e', 'foo', '--', '/r',
+      '--json', '--hidden', '--no-require-git', '--glob', '!.git/**', '--glob', '!**/dist/**', '--max-filesize', '10M', '-i', '-F', '-e', 'foo', '--', '/r',
     ])
   })
 
@@ -19,7 +19,7 @@ describe('rgArgs', () => {
         { ...opts, encoding: 'cp949', exclude: [] },
       ),
     ).toEqual([
-      '--json', '--hidden', '--glob', '!.git/**', '--max-filesize', '10M', '-E', 'cp949', '-w', '--glob', '*.ts', '--glob', 'src/**', '--glob', '!*.md', '-e', 'foo', '--', '/a', '/b',
+      '--json', '--hidden', '--no-require-git', '--glob', '!.git/**', '--max-filesize', '10M', '-E', 'cp949', '-w', '--glob', '*.ts', '--glob', 'src/**', '--glob', '!*.md', '-e', 'foo', '--', '/a', '/b',
     ])
   })
 })

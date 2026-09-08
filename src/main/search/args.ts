@@ -11,6 +11,7 @@ const splitGlobs = (text: string): string[] =>
 export const rgArgs = (spec: SearchSpec, roots: readonly string[], opts: RgOptions): string[] => [
   '--json',
   '--hidden',
+  '--no-require-git',
   '--glob',
   '!.git/**',
   ...opts.exclude.flatMap((g) => ['--glob', `!${g}`]),

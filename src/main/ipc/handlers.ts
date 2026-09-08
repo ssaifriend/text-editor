@@ -9,6 +9,8 @@ import { createFile, renamePath, trashPath } from '../fs/ops'
 import { readTextFile } from '../fs/read'
 import { listDirectory } from '../fs/tree'
 import type { IndexService } from '../index/service'
+import type { ReplaceService } from '../search/replace'
+import type { SearchService } from '../search/run'
 import { writeTextFile } from '../fs/write'
 import type { PtyManager } from '../pty/manager'
 import type { DirtyStore } from '../session/dirtyStore'
@@ -32,6 +34,8 @@ export type HandlerDeps = {
   readonly openWindow: (projectRoot: string | null) => void
   readonly session: SessionStore
   readonly index: IndexService
+  readonly search: SearchService
+  readonly replace: ReplaceService
 }
 
 export const registerHandlers = ({
@@ -46,6 +50,8 @@ export const registerHandlers = ({
   openWindow,
   session,
   index,
+  search,
+  replace,
 }: HandlerDeps): void => {
   handle('app.bootstrap', async (_request, { sender }) => {
     const info = windows.bySender(sender)
@@ -63,6 +69,20 @@ export const registerHandlers = ({
   handle('index.build', async ({ root }) => ok(await index.build(root)))
 
   handle('index.query', async ({ text, limit }) => ok({ items: await index.query(text, limit) }))
+
+  handle('search.run', async ({ id, spec, roots }) => {
+    search.run(id, spec, roots)
+    return ok(true as const)
+  })
+
+  handle('search.cancel', async ({ id }) => {
+    search.cancel(id)
+    return ok(true as const)
+  })
+
+  handle('search.replace', async (plan) => ok(await replace.replace(plan)))
+
+  handle('search.undoLast', async () => ok({ report: await replace.undoLast() }))
 
   ipcMain.on(channels.sessionSave, (event, raw: unknown) => {
     const parsed = WindowSnapshot.safeParse(raw)
