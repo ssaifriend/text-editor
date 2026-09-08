@@ -18,7 +18,7 @@ const collect = (id: string, run: () => void) =>
     const matches: SearchMatch[] = []
     listeners.push((channel, payload) => {
       if (payload.id !== id) return
-      if (channel === 'search.batch') matches.push(...(payload as { matches: SearchMatch[] }).matches)
+      if (channel === 'search.batch') matches.push(...(payload as unknown as { matches: SearchMatch[] }).matches)
       if (channel === 'search.done') resolve({ matches, done: payload as SearchDone })
     })
     run()

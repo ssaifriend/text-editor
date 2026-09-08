@@ -46,6 +46,16 @@ export const installMenu = (): void => {
       ],
     },
     {
+      label: 'Find',
+      submenu: [
+        command('Find…', 'find.open', 'CmdOrCtrl+F'),
+        command('Replace…', 'find.openReplace', 'CmdOrCtrl+Alt+F'),
+        { type: 'separator' },
+        command('Find in Files…', 'search.project', 'CmdOrCtrl+Shift+F'),
+        command('Undo Replace in Files', 'search.undoReplace'),
+      ],
+    },
+    {
       label: 'View',
       submenu: [
         command('Command Palette…', 'palette.commands', 'CmdOrCtrl+Shift+P'),

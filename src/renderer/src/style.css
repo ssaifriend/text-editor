@@ -374,3 +374,26 @@ html, body, #root {
 .tab.preview .tab-title { font-style: italic; opacity: 0.8; }
 .palette-item.hint { opacity: 0.6; font-style: italic; }
 .palette-title mark { background: transparent; color: #f9ae58; font-weight: bold; }
+
+.search-tab { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; font-size: 12px; }
+.search-form { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--border, #333); }
+.search-row { display: flex; align-items: center; gap: 4px; }
+.search-input { flex: 1; min-width: 0; background: var(--input-bg, #1e1e1e); color: inherit; border: 1px solid var(--border, #333); padding: 3px 6px; font: inherit; }
+.search-toggle, .search-run { background: transparent; color: inherit; border: 1px solid var(--border, #333); padding: 2px 6px; font: inherit; cursor: pointer; }
+.search-toggle.on { background: var(--accent, #f9ae58); color: #000; }
+.search-run:disabled { opacity: 0.4; cursor: default; }
+.search-status { margin-left: auto; opacity: 0.8; white-space: nowrap; }
+.search-results { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; font-family: var(--editor-font, ui-monospace, monospace); }
+.search-file-row { display: flex; align-items: center; gap: 6px; padding: 2px 8px; position: sticky; top: 0; background: var(--panel-bg, #252526); }
+.search-file-row.excluded .search-file-path { opacity: 0.5; text-decoration: line-through; }
+.search-chevron { cursor: pointer; width: 1em; }
+.search-file-path { cursor: pointer; font-weight: 600; }
+.search-file-count { opacity: 0.6; }
+.search-match { display: flex; align-items: baseline; gap: 6px; padding: 1px 8px 1px 28px; cursor: pointer; white-space: pre; }
+.search-match:hover { background: var(--hover-bg, rgba(255, 255, 255, 0.06)); }
+.search-match.excluded .search-text { opacity: 0.45; }
+.search-line { min-width: 3em; text-align: right; opacity: 0.6; }
+.search-text mark { background: transparent; color: var(--accent, #f9ae58); font-weight: bold; }
+.search-text del { color: #e06c75; }
+.search-text ins { color: #98c379; text-decoration: none; }
+.search-more { padding: 4px 8px; opacity: 0.6; }

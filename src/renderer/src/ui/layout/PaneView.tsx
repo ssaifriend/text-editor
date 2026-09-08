@@ -6,6 +6,7 @@ import { FindPanel } from '../find/FindPanel'
 import { TabStrip } from '../tabs/TabStrip'
 import { TerminalHost } from '../terminal/TerminalHost'
 import { DiffHost } from '../diff/DiffHost'
+import { SearchHost } from '../search/SearchHost'
 import { themeById } from '../../theme/themes'
 import type { PaneLeaf, PaneNode, PaneSplit } from './paneTree'
 import { SplitGutter } from './SplitGutter'
@@ -25,6 +26,11 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
     const tab = activeTab()
     return tab?.kind === 'diff' ? tab : null
   }
+  const searchTab = () => {
+    const tab = activeTab()
+    return tab?.kind === 'search' ? tab : null
+  }
+  const editorHidden = () => terminalId() !== null || diffTab() !== null || searchTab() !== null
 
   return (
     <div
@@ -34,7 +40,7 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
     >
       <TabStrip ws={props.ws} leaf={props.leaf} />
       <Banner ws={props.ws} leaf={props.leaf} />
-      <div class="editor-host-wrap" classList={{ hidden: terminalId() !== null || diffTab() !== null }}>
+      <div class="editor-host-wrap" classList={{ hidden: editorHidden() }}>
         <EditorHost ws={props.ws} leaf={props.leaf} />
       </div>
       <Show when={terminalId()}>{(id) => <TerminalHost ws={props.ws} leaf={props.leaf} ptyId={id} />}</Show>
@@ -47,7 +53,10 @@ const LeafView = (props: { ws: Workspace; leaf: () => PaneLeaf }) => {
           />
         )}
       </Show>
-      <Show when={props.ws.state.activePane === props.leaf().id && terminalId() === null && diffTab() === null}>
+      <Show when={searchTab()} keyed>
+        {(tab) => <SearchHost ws={props.ws} searchId={tab.searchId} />}
+      </Show>
+      <Show when={props.ws.state.activePane === props.leaf().id && !editorHidden()}>
         <FindPanel ws={props.ws} />
       </Show>
     </div>

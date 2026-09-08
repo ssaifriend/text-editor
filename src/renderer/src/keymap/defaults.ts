@@ -17,6 +17,7 @@ const common: readonly Binding[] = [
   { keys: 'mod+;', command: 'palette.gotoWord' },
   { keys: 'mod+f', command: 'find.open' },
   { keys: 'mod+alt+f', command: 'find.openReplace' },
+  { keys: 'mod+shift+f', command: 'search.project' },
   { keys: 'mod+alt+2', command: 'view.splitRight' },
   { keys: 'mod+alt+shift+2', command: 'view.splitDown' },
   { keys: 'mod+alt+1', command: 'view.singlePane' },

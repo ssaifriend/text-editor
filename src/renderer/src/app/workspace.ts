@@ -5,12 +5,13 @@ import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { A, D, R, pipe } from '@mobily/ts-belt'
 import { createSignal, type Accessor } from 'solid-js'
-import { createStore, produce } from 'solid-js/store'
+import { createStore, produce, unwrap } from 'solid-js/store'
 import { type Settings, resolveForLanguage } from '@shared/config'
 import type { EncodingName, Eol } from '@shared/encoding'
 import { fnv1a32 } from '@shared/hash'
 import type { DirtyEntry, OpenedFile, SaveError, TreeEntry } from '@shared/ipc'
-import type { BufferTabSnapshot, LeafSnapshot, PaneSnapshot, TabSnapshot, WindowSnapshot } from '@shared/session'
+import type { ReplaceReport, SearchMatch, SearchSpec } from '@shared/search'
+import type { BufferTabSnapshot, LeafSnapshot, PaneSnapshot, SearchTabSnapshot, TabSnapshot, WindowSnapshot } from '@shared/session'
 import {
   type Buffer,
   type BufferId,
@@ -36,6 +37,17 @@ import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
 import { invoke, on } from '../ipc'
+import { searchState as searchLocal } from '../search/local'
+import {
+  type SearchState,
+  appendBatch,
+  bufferEdits,
+  emptySearch,
+  planFor,
+  replaceFileResults,
+  toggleCollapsed,
+  toggleExcluded,
+} from '../search/state'
 import { type TerminalRegistry, createTerminalRegistry } from '../terminal/registry'
 import { xtermTheme } from '../terminal/theme'
 import type { DirtySync } from './dirtySync'
@@ -63,6 +75,7 @@ export type Tab =
   | { readonly id: TabId; readonly kind: 'buffer'; readonly bufferId: BufferId; readonly preview?: boolean }
   | { readonly id: TabId; readonly kind: 'terminal'; readonly ptyId: string }
   | { readonly id: TabId; readonly kind: 'diff'; readonly bufferId: BufferId; readonly diskText: string; readonly bufferText: string; readonly title: string }
+  | { readonly id: TabId; readonly kind: 'search'; readonly searchId: string }
 
 export type TerminalMeta = {
   readonly id: string
@@ -111,6 +124,8 @@ export type WorkspaceState = {
   }
   findFocused: boolean
   mru: string[]
+  searches: Record<string, SearchState>
+  searchFocused: boolean
   sidebar: { open: boolean; expanded: Record<string, true>; entries: Record<string, TreeEntry[]> }
   activePane: PaneId
   editorFocused: boolean
@@ -184,6 +199,16 @@ export type Workspace = {
   readonly findSelectAll: () => void
   readonly replaceNext: () => void
   readonly replaceAll: () => void
+  readonly openSearch: (initial?: Partial<SearchSpec>) => void
+  readonly setSearchSpec: (searchId: string, patch: Partial<SearchSpec>) => void
+  readonly setSearchReplacement: (searchId: string, replacement: string, preserveCase?: boolean) => void
+  readonly setSearchFocus: (focused: boolean) => void
+  readonly runSearch: (searchId: string) => Promise<void>
+  readonly toggleSearchExcluded: (searchId: string, key: string) => void
+  readonly toggleSearchCollapsed: (searchId: string, path: string) => void
+  readonly openMatch: (match: SearchMatch, preview: boolean) => Promise<void>
+  readonly searchReplaceAll: (searchId: string) => Promise<{ closed: ReplaceReport; buffers: number }>
+  readonly searchUndoReplace: () => Promise<ReplaceReport | null>
   readonly toggleSidebar: () => void
   readonly expandDir: (dir: string) => Promise<void>
   readonly collapseDir: (dir: string) => void
@@ -268,6 +293,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     find: { open: false, replaceOpen: false, spec: defaultFindSpec, valid: false, count: 0, capped: false, current: null, history: [] },
     findFocused: false,
     mru: [],
+    searches: {},
+    searchFocused: false,
     sidebar: { open: true, expanded: {}, entries: {} },
     activePane: firstPane,
     editorFocused: false,
@@ -495,6 +522,18 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       return
     }
 
+    if (tab.kind === 'search') {
+      void invoke('search.cancel', { id: tab.searchId })
+      setTree(removeTab(currentTree, tabId))
+      setState(
+        produce((s) => {
+          delete s.tabs[tabId]
+          delete s.searches[tab.searchId]
+        }),
+      )
+      return
+    }
+
     const buffer = buffers[tab.bufferId]
     if (buffer) dirtySync.changed(dirtyEntry(buffer), false)
     if (buffer?.meta) void invoke('fs.unwatch', { path: buffer.meta.path })
@@ -589,7 +628,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       return
     }
 
-    if (tab.kind === 'diff') {
+    if (tab.kind === 'diff' || tab.kind === 'search') {
       dropTab(tab.id)
       return
     }
@@ -1223,6 +1262,10 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       const term = state.terminals[tab.ptyId]
       return term ? { kind: 'terminal', cwd: term.cwd, title: term.title } : null
     }
+    if (tab.kind === 'search') {
+      const search = state.searches[tab.searchId]
+      return search ? { kind: 'search', spec: { ...unwrap(search).spec }, replacement: search.replacement } : null
+    }
     return null
   }
 
@@ -1322,7 +1365,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
       setState('activePane', leaf.id)
       for (const tabSnap of leaf.snap.tabs) {
         if (tabSnap.kind === 'buffer') await restoreBufferTab(tabSnap, dirtyById[tabSnap.dirtyId])
-        else await restoreTerminalTab(tabSnap)
+        else if (tabSnap.kind === 'terminal') await restoreTerminalTab(tabSnap)
+        else restoreSearchTab(tabSnap)
       }
       const restoredLeaf = findLeaf(currentTree, leaf.id)
       const activeTab = restoredLeaf && leaf.snap.active !== null ? restoredLeaf.tabs[leaf.snap.active] : undefined
@@ -1338,6 +1382,162 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
     const targetLeaf = leafAtPath(currentTree, snap.activePath) ?? leaves(currentTree)[0]
     if (targetLeaf) focusView(targetLeaf.id)
+  }
+
+  let searchCounter = 0
+
+  const searchTab = (): Extract<Tab, { kind: 'search' }> | undefined =>
+    D.values(state.tabs).find((t): t is Extract<Tab, { kind: 'search' }> => t.kind === 'search')
+
+  const selectedTextForSearch = (): string | null => {
+    const view = activeView()
+    if (!view) return null
+    const { from, to } = view.state.selection.main
+    const text = view.state.sliceDoc(from, to)
+    return from !== to && !text.includes('\n') ? text : null
+  }
+
+  const addSearchTab = (search: SearchState): void => {
+    setState('searches', search.id, search)
+    addTabToActive({ id: nextTabId(), kind: 'search', searchId: search.id })
+  }
+
+  const restoreSearchTab = (snap: SearchTabSnapshot): void => {
+    searchCounter += 1
+    addSearchTab({ ...emptySearch(`${state.windowId}-s${searchCounter}`, snap.spec), replacement: snap.replacement })
+  }
+
+  const openSearch = (initial: Partial<SearchSpec> = {}): void => {
+    const seed = initial.pattern ?? selectedTextForSearch()
+    const existing = searchTab()
+    if (existing) {
+      const leaf = leafOfTab(currentTree, existing.id)
+      if (leaf) setTree(setActiveTab(currentTree, leaf.id, existing.id))
+      if (seed) setSearchSpec(existing.searchId, { pattern: seed })
+      return
+    }
+
+    searchCounter += 1
+    addSearchTab(emptySearch(`${state.windowId}-s${searchCounter}`, { ...initial, ...(seed ? { pattern: seed } : {}) }))
+  }
+
+  const setSearchSpec = (searchId: string, patch: Partial<SearchSpec>): void => {
+    if (state.searches[searchId]) setState('searches', searchId, (s): SearchState => ({ ...s, spec: { ...s.spec, ...patch } }))
+  }
+
+  const setSearchReplacement = (searchId: string, replacement: string, preserveCase?: boolean): void => {
+    if (!state.searches[searchId]) return
+    setState('searches', searchId, (s): SearchState => ({ ...s, replacement, preserveCase: preserveCase ?? s.preserveCase }))
+  }
+
+  const runSearch = async (searchId: string): Promise<void> => {
+    const current = state.searches[searchId] ? unwrap(state.searches[searchId]) : undefined
+    if (!current || current.spec.pattern === '') return
+
+    const fallbackRoot = dirnameOf(activeBuffer()?.meta?.path ?? '')
+    const roots = state.projectRoot ? [state.projectRoot] : fallbackRoot ? [fallbackRoot] : []
+    if (roots.length === 0) {
+      setState('searches', searchId, (s): SearchState => ({ ...s, status: 'error', error: 'No folder open' }))
+      return
+    }
+
+    setState('searches', searchId, (): SearchState => ({
+      ...emptySearch(searchId, current.spec),
+      replacement: current.replacement,
+      preserveCase: current.preserveCase,
+      status: 'running',
+    }))
+    for (const buffer of D.values(buffers)) {
+      const path = buffer.meta?.path
+      if (!path || !isDirty(buffer)) continue
+      setState('searches', searchId, (s) => replaceFileResults(s, path, searchLocal(current.spec, path, buffer.state)))
+    }
+    await invoke('search.run', { id: searchId, spec: current.spec, roots })
+  }
+
+  on('search.batch', ({ id, matches }) => {
+    if (!state.searches[id]) return
+    const fresh = matches.filter((m) => {
+      const buffer = bufferByPath(m.path)
+      return !(buffer && isDirty(buffer))
+    })
+    setState('searches', id, (s) => appendBatch(s, fresh))
+  })
+
+  on('search.done', ({ id, truncated, error }) => {
+    if (!state.searches[id]) return
+    setState('searches', id, (s): SearchState => ({ ...s, status: error ? 'error' : 'done', error, truncated }))
+  })
+
+  const toggleSearchExcluded = (searchId: string, key: string): void => {
+    if (state.searches[searchId]) setState('searches', searchId, (s) => toggleExcluded(s, key))
+  }
+
+  const toggleSearchCollapsed = (searchId: string, path: string): void => {
+    if (state.searches[searchId]) setState('searches', searchId, (s) => toggleCollapsed(s, path))
+  }
+
+  const openMatch = async (match: SearchMatch, preview: boolean): Promise<void> => {
+    const opened = preview ? await previewFile(match.path) : await openFile(match.path)
+    if (!opened) return
+    if (!preview) commitPreview()
+
+    const view = activeView()
+    if (!view) return
+    const line = view.state.doc.line(Math.min(match.line, view.state.doc.lines))
+    const from = Math.min(line.from + match.from, line.to)
+    const to = Math.min(line.from + match.to, line.to)
+    view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true })
+  }
+
+  const applyToBuffer = (buffer: Buffer, changes: readonly { from: number; to: number; insert: string }[]): void => {
+    const view = viewShowing(buffer.id)
+    if (view) view.dispatch({ changes: [...changes], userEvent: 'search.replace' })
+    else putBuffer({ ...buffer, state: buffer.state.update({ changes: [...changes] }).state })
+  }
+
+  const diskHashOf = async (path: string): Promise<string | null> => {
+    const result = await invoke('fs.open', { path })
+    return R.isOk(result) ? R.getExn(result).hash : null
+  }
+
+  const searchReplaceAll = async (searchId: string): Promise<{ closed: ReplaceReport; buffers: number }> => {
+    const empty: ReplaceReport = { changed: [], skipped: [] }
+    const search = state.searches[searchId] ? unwrap(state.searches[searchId]) : undefined
+    if (!search || search.replacement === '') return { closed: empty, buffers: 0 }
+
+    let touched = 0
+    const hashes: Record<string, string> = {}
+    for (const file of search.files) {
+      const buffer = bufferByPath(file.path)
+      if (buffer) {
+        const edits = bufferEdits(search, file.path, buffer.state)
+        if (edits.length === 0) continue
+        applyToBuffer(buffer, edits)
+        touched += 1
+      } else if (file.source === 'disk') {
+        const hash = await diskHashOf(file.path)
+        if (hash) hashes[file.path] = hash
+      }
+    }
+
+    const plan = planFor(search, hashes)
+    const closed = plan.files.length > 0 ? R.getWithDefault(await invoke('search.replace', plan), empty) : empty
+    const skipped = closed.skipped.length > 0 ? `, skipped ${closed.skipped.length}` : ''
+    setState('status', `Replaced in ${closed.changed.length} file(s) on disk, ${touched} open buffer(s)${skipped}`)
+    return { closed, buffers: touched }
+  }
+
+  const searchUndoReplace = async (): Promise<ReplaceReport | null> => {
+    const result = await invoke('search.undoLast', undefined)
+    const report = R.getWithDefault(result, { report: null }).report
+    setState(
+      'status',
+      report
+        ? `Undo Replace in Files: restored ${report.changed.length} file(s)${report.skipped.length > 0 ? `, skipped ${report.skipped.length}` : ''}`
+        : 'Nothing to undo',
+    )
+    return report
   }
 
   const leafAtPath = (node: PaneNode, path: readonly number[]): PaneLeaf | null => {
@@ -1421,6 +1621,16 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     findSelectAll,
     replaceNext: replaceNextCmd,
     replaceAll: replaceAllCmd,
+    openSearch,
+    setSearchSpec,
+    setSearchReplacement,
+    setSearchFocus: (focused) => setState('searchFocused', focused),
+    runSearch,
+    toggleSearchExcluded,
+    toggleSearchCollapsed,
+    openMatch,
+    searchReplaceAll,
+    searchUndoReplace,
     toggleSidebar,
     expandDir,
     collapseDir,

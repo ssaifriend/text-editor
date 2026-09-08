@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { SearchSpec } from './search'
 import { encodingNames, eolNames } from './encoding'
 
 export const BufferTabSnapshot = z.object({
@@ -18,7 +19,10 @@ export type BufferTabSnapshot = z.infer<typeof BufferTabSnapshot>
 export const TerminalTabSnapshot = z.object({ kind: z.literal('terminal'), cwd: z.string(), title: z.string() })
 export type TerminalTabSnapshot = z.infer<typeof TerminalTabSnapshot>
 
-export const TabSnapshot = z.discriminatedUnion('kind', [BufferTabSnapshot, TerminalTabSnapshot])
+export const SearchTabSnapshot = z.object({ kind: z.literal('search'), spec: SearchSpec, replacement: z.string() })
+export type SearchTabSnapshot = z.infer<typeof SearchTabSnapshot>
+
+export const TabSnapshot = z.discriminatedUnion('kind', [BufferTabSnapshot, TerminalTabSnapshot, SearchTabSnapshot])
 export type TabSnapshot = z.infer<typeof TabSnapshot>
 
 export type LeafSnapshot = { kind: 'leaf'; tabs: TabSnapshot[]; active: number | null }

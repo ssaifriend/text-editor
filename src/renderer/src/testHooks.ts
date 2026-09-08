@@ -46,6 +46,8 @@ export type MoruTestHooks = {
   scrollTop(): number
   findHistory(): string[]
   findState(): { open: boolean; count: number; current: number | null }
+  searchState(): { status: string; total: number; files: { path: string; count: number; source: string }[] } | null
+  searchTabs(): number
 }
 
 declare global {
@@ -140,6 +142,15 @@ export const installTestHooks = (
     snapshotNow: () => ws.snapshot(),
     findHistory: () => [...ws.state.find.history],
     findState: () => ({ open: ws.state.find.open, count: ws.state.find.count, current: ws.state.find.current }),
+    searchState: () => {
+      const active = ws.activeLeaf().active
+      const tab = active ? ws.state.tabs[active] : undefined
+      const search = tab?.kind === 'search' ? ws.state.searches[tab.searchId] : undefined
+      return search
+        ? { status: search.status, total: search.total, files: search.files.map((f) => ({ path: f.path, count: f.matches.length, source: f.source })) }
+        : null
+    },
+    searchTabs: () => Object.values(ws.state.tabs).filter((t) => t.kind === 'search').length,
     scrollTop: () => view().scrollDOM.scrollTop,
     bannerKind: () => {
       const b = ws.activeBuffer()
