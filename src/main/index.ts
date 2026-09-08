@@ -3,6 +3,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { channels } from '@shared/channels'
 import { registerHandlers } from './ipc/handlers'
 import { markDidFinishLoad, markFirstPaint, markReady, metrics } from './perf'
+import { probePty } from './pty/probe'
 import { createWindow } from './window'
 
 const isTest = process.env['MORU_TEST'] === '1'
@@ -12,6 +13,7 @@ if (userDataOverride) app.setPath('userData', userDataOverride)
 
 const exposeTestGlobals = (): void => {
   globalThis.__moruMetrics = metrics
+  globalThis.__moruProbePty = probePty
 }
 
 app.whenReady().then(() => {
@@ -38,4 +40,6 @@ app.on('window-all-closed', () => {
 declare global {
   // eslint-disable-next-line no-var
   var __moruMetrics: typeof metrics | undefined
+  // eslint-disable-next-line no-var
+  var __moruProbePty: typeof probePty | undefined
 }
