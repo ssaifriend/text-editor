@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, statSync } from 'node:fs'
 import { dialog, ipcMain } from 'electron'
 import { channels } from '@shared/channels'
 import { CloseChoice, ContextMenuRequest, PtyAck } from '@shared/ipc'
@@ -110,6 +110,19 @@ export const registerHandlers = ({
   })
 
   handle('fs.tree', ({ dir }) => listDirectory(dir))
+
+  handle('fs.exists', async ({ paths }) => {
+    const expand = (p: string): string => (p.startsWith('~/') || p === '~' ? `${home}${p.slice(1)}` : p)
+    const isFile = (p: string): boolean => {
+      try {
+        return statSync(p).isFile()
+      } catch {
+        return false
+      }
+    }
+    const found = paths.map(expand).find(isFile) ?? null
+    return ok({ path: found })
+  })
   handle('fs.create', ({ path }) => createFile(path))
   handle('fs.rename', ({ from, to }) => renamePath(from, to))
   handle('fs.delete', ({ path }) => trashPath(path))

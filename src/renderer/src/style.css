@@ -26,9 +26,11 @@ html, body, #root {
   display: flex;
   gap: 12px;
   align-items: center;
-  padding: 4px 8px;
+  height: 24px;
+  padding: 0 8px;
   background: var(--bar);
   flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 
@@ -125,7 +127,9 @@ html, body, #root {
   overflow: hidden;
 }
 
-.statusbar .grow { flex: 1 1 auto; text-align: right; opacity: 0.7; }
+.statusbar .grow { flex: 1 1 auto; text-align: right; opacity: 0.7; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.statusbar .status-path { direction: rtl; }
+.statusbar .status-path > * { direction: ltr; }
 
 .palette-backdrop {
   position: fixed;
@@ -315,16 +319,25 @@ html, body, #root {
 
 .tree-row {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
-  padding: 2px 8px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 13px;
   cursor: default;
   user-select: none;
   white-space: nowrap;
 }
 
 .tree-row:hover { background: var(--selection); }
-.tree-chevron { width: 12px; opacity: 0.7; font-size: 10px; }
+.tree-row.active { background: color-mix(in srgb, var(--selection) 70%, transparent); }
+.tree-chevron { width: 12px; flex: none; opacity: 0.6; font-size: 10px; text-align: center; }
+.tree-icon { width: 16px; height: 16px; flex: none; }
+.tree-icon.dir { color: #e6b455; }
+.tree-icon.file { color: color-mix(in srgb, var(--fg) 65%, transparent); }
+.tree-name { overflow: hidden; text-overflow: ellipsis; }
+
+.mod-held .cm-path-link { text-decoration: underline; cursor: pointer; }
 
 .sidebar-menu { position: fixed; z-index: 60; }
 .sidebar-menu .popup { position: static; border-radius: 6px; }

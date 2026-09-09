@@ -37,6 +37,8 @@ import { themeCompartment } from '../theme/apply'
 import { themeById } from '../theme/themes'
 import { languageById } from '../editor/lang'
 import { type Indent, detectIndent } from '../editor/indentDetect'
+import { pathCandidates } from '../editor/pathCandidates'
+import type { PathRef } from '../terminal/links'
 import { saveChanges } from '../editor/saveTransforms'
 import { markdownExtensions } from '../markdown/extension'
 import { exportName, wrapDocument } from '../markdown/exportHtml'
@@ -393,7 +395,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
   }
 
   const extensionsFor = (languageId: string, indent: Indent | null = null): Extension => [
-    baseExtensions(languageById(languageId).load(), { onUpdate }),
+    baseExtensions(languageById(languageId).load(), { onUpdate, openPathRef: (ref) => void openPathRef(ref) }),
     languageId === 'markdown' ? markdownExtensions({ linkOnPaste: () => settings().markdown.linkOnPaste }) : [],
     indentOverride.of(indent ? indentExtension(indent.tabSize, indent.insertSpaces) : []),
     settingsCompartment.of(configExtensions(resolveForLanguage(settings(), languageId))),
@@ -668,11 +670,13 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
         if (choice === 'cancel') return
       }
       dropTab(tab.id)
+      ensureOneTab()
       return
     }
 
     if (tab.kind === 'diff' || tab.kind === 'search' || tab.kind === 'preview') {
       dropTab(tab.id)
+      ensureOneTab()
       return
     }
 
@@ -689,6 +693,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     }
 
     dropTab(tab.id)
+    ensureOneTab()
   }
 
   const activateTab = (paneId: PaneId, tabId: TabId): void => {
@@ -933,6 +938,18 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
   }
 
+  const openPathRef = async (ref: PathRef): Promise<void> => {
+    const cwd = state.terminals[activeTerminalId() ?? lastLiveTerminalId() ?? '']?.cwd ?? null
+    const candidates = pathCandidates(ref.path, activeBuffer()?.meta?.path ?? null, state.projectRoot, cwd)
+    const result = await invoke('fs.exists', { paths: candidates })
+    const found = R.getWithDefault(result, { path: null }).path
+    if (!found) {
+      setState('status', `not found: ${ref.path}`)
+      return
+    }
+    await openPathAt(found, ref.line, ref.col)
+  }
+
   let terminalCount = 0
 
   const terminalRegistry = createTerminalRegistry({
@@ -1127,9 +1144,14 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     previewOrigin = null
   }
 
+  const ensureOneTab = (): void => {
+    if (D.values(state.tabs).length === 0) newUntitled()
+  }
+
   const cancelPreview = (): void => {
     const id = previewTabId()
     if (id) dropTab(id)
+    ensureOneTab()
     if (previewOrigin) {
       const { paneId, tabId } = previewOrigin
       if (tabId && findLeaf(currentTree, paneId)?.tabs.includes(tabId)) setTree(setActiveTab(currentTree, paneId, tabId))

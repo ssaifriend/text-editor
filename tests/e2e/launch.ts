@@ -1,9 +1,19 @@
-import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
+import { _electron as electron, test, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 export type Launched = { readonly app: ElectronApplication; readonly page: Page; readonly userData: string }
+
+const launched = new Set<ElectronApplication>()
+
+test.afterEach(async () => {
+  const leaked = [...launched]
+  launched.clear()
+  await Promise.all(
+    leaked.map((app) => Promise.race([app.close().catch(() => undefined), new Promise((r) => setTimeout(r, 5000))])),
+  )
+})
 
 export const launchApp = async (
   env: Record<string, string> = {},
@@ -15,6 +25,9 @@ export const launchApp = async (
     args: [resolve('out/main/index.js')],
     env: { ...process.env, MORU_TEST: '1', MORU_HIDDEN: '1', MORU_USER_DATA: userData, ...env },
   })
+
+  launched.add(app)
+  app.on('close', () => launched.delete(app))
 
   const page = await app.firstWindow()
   await page.waitForSelector('#root')

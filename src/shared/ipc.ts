@@ -117,6 +117,7 @@ export const contracts = {
   'fs.watch': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), UnexpectedError) },
   'fs.unwatch': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), UnexpectedError) },
   'fs.tree': { request: z.object({ dir: z.string() }), response: ipcResult(z.array(TreeEntry), OpenError) },
+  'fs.exists': { request: z.object({ paths: z.array(z.string()).max(16) }), response: ipcResult(z.object({ path: z.string().nullable() }), UnexpectedError) },
   'fs.create': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), OpenError) },
   'fs.rename': { request: z.object({ from: z.string(), to: z.string() }), response: ipcResult(z.literal(true), OpenError) },
   'fs.delete': { request: z.object({ path: z.string() }), response: ipcResult(z.literal(true), OpenError) },

@@ -17,6 +17,7 @@ import type { Platform } from './keymap/keys'
 import { installTestHooks } from './testHooks'
 import { applyTheme } from './theme/apply'
 import { registerUserThemes, themeById } from './theme/themes'
+import { installModifierTracking } from './editor/pathLinks'
 import { PaneView } from './ui/layout/PaneView'
 import { Sidebar } from './ui/sidebar/Sidebar'
 import { Palette, type PaletteMode } from './ui/palette/Palette'
@@ -88,9 +89,11 @@ export const App = () => {
 
   onMount(async () => {
     const uninstall = installKeymap(window, bindings, registry, context)
+    const uninstallModifiers = installModifierTracking(window)
     const offCommand = on('command.run', ({ id, args }) => void registry.run(id, args))
     onCleanup(() => {
       uninstall()
+      uninstallModifiers()
       offCommand()
     })
 

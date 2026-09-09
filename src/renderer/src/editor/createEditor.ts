@@ -15,8 +15,9 @@ import {
 import { findExtensions } from '../find/panelExtension'
 import { compositionObserver } from './compositionObserver'
 import { externalChangeAnnotation } from './externalChange'
+import { type PathLinkHooks, pathLinks } from './pathLinks'
 
-export type ViewHooks = {
+export type ViewHooks = PathLinkHooks & {
   readonly onUpdate: (state: EditorState, view: EditorView, external: boolean) => void
 }
 
@@ -35,6 +36,7 @@ export const baseExtensions = (language: Extension, hooks: ViewHooks): Extension
   keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
   findExtensions,
   compositionObserver,
+  pathLinks(hooks),
   language,
   EditorView.updateListener.of((update) => {
     if (!update.docChanged && !update.selectionSet) return

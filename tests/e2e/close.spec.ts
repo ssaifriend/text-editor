@@ -23,7 +23,7 @@ test('closing a dirty tab with dontSave discards the edit', async () => {
   await edit(page)
 
   await page.evaluate(() => window.__moruTest!.runCommand('tab.close'))
-  await expect.poll(() => page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.length)).toBe(0)
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
   expect(readFileSync(path, 'utf8')).toBe('v1\n')
 
   await app.close()
@@ -35,7 +35,7 @@ test('closing a dirty tab with save writes the file first', async () => {
   await edit(page)
 
   await page.evaluate(() => window.__moruTest!.runCommand('tab.close'))
-  await expect.poll(() => page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.length)).toBe(0)
+  await expect.poll(() => page.evaluate(() => window.__moruTest!.tabs()[0]?.tabs.map((t) => t.title))).toEqual(['untitled'])
   expect(readFileSync(path, 'utf8')).toBe('xv1\n')
 
   await app.close()

@@ -70,6 +70,15 @@ export const StatusBar = (props: { ws: Workspace }) => {
     ]
   }
 
+  const displayPath = (): string => {
+    const meta = activeMeta()
+    if (!meta) return ''
+    if (!meta.path) return 'untitled'
+    const root = props.ws.state.projectRoot
+    const under = root !== null && meta.path.startsWith(root) && /[\\/]/.test(meta.path.charAt(root.length))
+    return under ? meta.path.slice(root.length + 1) : meta.path
+  }
+
   const indentLabel = (): string => {
     const meta = activeMeta()
     return meta ? `${meta.insertSpaces ? 'Spaces' : 'Tabs'}: ${meta.tabSize}` : ''
@@ -107,8 +116,8 @@ export const StatusBar = (props: { ws: Workspace }) => {
       <button class="status-item" data-testid="indent" onClick={toggle('indent')}>
         {indentLabel()}
       </button>
-      <span class="grow" data-testid="path">
-        {activeMeta()?.path ?? (activeMeta() ? 'untitled' : '')}
+      <span class="grow status-path" data-testid="path" title={activeMeta()?.path ?? ''}>
+        {displayPath()}
       </span>
       <span data-testid="status">{props.ws.state.status}</span>
       <Show when={open()}>

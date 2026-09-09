@@ -24,7 +24,7 @@ test('sidebar lists the project root, expands directories, opens files', async (
 
   await page.getByTestId('tree-row').filter({ hasText: 'index.ts' }).click()
   await expect.poll(() => page.evaluate(() => window.__moruTest!.doc())).toBe('export const x = 1\n')
-  await expect(page.getByTestId('path')).toHaveText(join(root, 'src', 'index.ts'))
+  await expect(page.getByTestId('path')).toHaveText('src/index.ts')
 
   await page.evaluate(() => window.__moruTest!.runCommand('sidebar.toggle'))
   await expect(page.getByTestId('sidebar')).toBeHidden()
