@@ -1,5 +1,8 @@
-import { app, Menu, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, Menu, type MenuItemConstructorOptions, type WebContents } from 'electron'
+import type { ContextMenuRequest } from '@shared/ipc'
 import { pushToAll } from './ipc/push'
+import { pushTo } from './windows'
+import { editorContextMenu } from './menu/context'
 
 const command = (label: string, id: string, accelerator?: string): MenuItemConstructorOptions => ({
   id,
@@ -93,4 +96,10 @@ export const installMenu = (): void => {
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+export const showContextMenu = (sender: WebContents, req: ContextMenuRequest): void => {
+  const window = BrowserWindow.fromWebContents(sender)
+  if (!window) return
+  Menu.buildFromTemplate(editorContextMenu(req, (id) => pushTo(sender, 'command.run', { id }))).popup({ window })
 }

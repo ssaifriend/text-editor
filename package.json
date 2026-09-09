@@ -40,6 +40,7 @@
     "@electron-toolkit/utils": "4.0.0",
     "@lezer/highlight": "1.2.3",
     "@mobily/ts-belt": "3.13.1",
+    "@nextjournal/lang-clojure": "1.0.0",
     "@parcel/watcher": "2.6.0",
     "@vscode/ripgrep": "1.18.0",
     "@xterm/addon-fit": "0.11.0",

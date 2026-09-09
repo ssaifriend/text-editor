@@ -222,6 +222,7 @@ export type Workspace = {
   readonly exportMarkdown: (bufferId: BufferId | null, kind: 'html' | 'pdf') => Promise<void>
   readonly copyMarkdownHtml: (bufferId: BufferId | null) => Promise<void>
   readonly toggleSidebar: () => void
+  readonly revealInSidebar: (path: string) => Promise<void>
   readonly expandDir: (dir: string) => Promise<void>
   readonly collapseDir: (dir: string) => void
   readonly refreshDir: (dir: string) => Promise<void>
@@ -1662,6 +1663,23 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     setState('status', 'HTML copied')
   }
 
+  const revealInSidebar = async (path: string): Promise<void> => {
+    const root = state.projectRoot
+    if (!root || !path.startsWith(root)) {
+      setState('status', 'file is outside the open folder')
+      return
+    }
+    if (!state.sidebar.open) setState('sidebar', 'open', true)
+
+    const rel = path.slice(root.length + 1).split(/[\\/]/)
+    let dir = root
+    for (const part of rel.slice(0, -1)) {
+      dir = joinName(dir, part)
+      await expandDir(dir)
+    }
+    requestAnimationFrame(() => document.querySelector(`[data-testid="tree-row"][data-path="${CSS.escape(path)}"]`)?.scrollIntoView({ block: 'nearest' }))
+  }
+
   const leafAtPath = (node: PaneNode, path: readonly number[]): PaneLeaf | null => {
     if (node.kind === 'leaf') return path.length === 0 ? node : null
     const [head, ...rest] = path
@@ -1759,6 +1777,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     exportMarkdown,
     copyMarkdownHtml,
     toggleSidebar,
+    revealInSidebar,
     expandDir,
     collapseDir,
     refreshDir,

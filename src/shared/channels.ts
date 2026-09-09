@@ -31,6 +31,7 @@ export const channels = {
   dirtyList: 'dirty.list',
   perfFirstPaint: 'perf.firstPaint',
   logWrite: 'log.write',
+  menuContext: 'menu.context',
   configChanged: 'config.changed',
   keymapChanged: 'keymap.changed',
   themesChanged: 'themes.changed',
@@ -52,7 +53,7 @@ export const channels = {
 
 export type Channel = (typeof channels)[keyof typeof channels]
 
-export const sendChannels: readonly Channel[] = [channels.perfFirstPaint, channels.logWrite, channels.ptyAck, channels.sessionSave]
+export const sendChannels: readonly Channel[] = [channels.perfFirstPaint, channels.logWrite, channels.ptyAck, channels.sessionSave, channels.menuContext]
 
 export const pushChannels: readonly Channel[] = [
   channels.configChanged,

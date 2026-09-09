@@ -10,6 +10,8 @@ import { sql } from '@codemirror/lang-sql'
 import { yaml } from '@codemirror/lang-yaml'
 import { StreamLanguage } from '@codemirror/language'
 import { shell } from '@codemirror/legacy-modes/mode/shell'
+import { clojure } from '@nextjournal/lang-clojure'
+import { rescript } from './rescript'
 import type { Extension } from '@codemirror/state'
 import { A, D, O, S, pipe } from '@mobily/ts-belt'
 
@@ -33,6 +35,8 @@ export const languages: readonly Language[] = [
   { id: 'yaml', name: 'YAML', load: () => yaml() },
   { id: 'sql', name: 'SQL', load: () => sql() },
   { id: 'shell', name: 'Shell', load: () => StreamLanguage.define(shell) },
+  { id: 'clojure', name: 'Clojure', load: () => clojure() },
+  { id: 'rescript', name: 'ReScript', load: () => StreamLanguage.define(rescript) },
 ]
 
 const byExtension: Record<string, string> = {
@@ -60,6 +64,12 @@ const byExtension: Record<string, string> = {
   sh: 'shell',
   bash: 'shell',
   zsh: 'shell',
+  clj: 'clojure',
+  cljs: 'clojure',
+  cljc: 'clojure',
+  edn: 'clojure',
+  res: 'rescript',
+  resi: 'rescript',
 }
 
 const byFilename: Record<string, string> = {

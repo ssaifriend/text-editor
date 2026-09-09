@@ -197,5 +197,14 @@ export const pushContracts = {
 export type PushChannel = keyof typeof pushContracts
 export type PushPayload<C extends PushChannel> = z.infer<(typeof pushContracts)[C]>
 
+export const ContextMenuRequest = z.object({
+  kind: z.literal('editor'),
+  hasSelection: z.boolean(),
+  languageId: z.string(),
+  path: z.string().nullable(),
+  hasTerminal: z.boolean(),
+})
+export type ContextMenuRequest = z.infer<typeof ContextMenuRequest>
+
 export const PtyAck = z.object({ id: z.string(), bytes: z.number().int().nonnegative() })
 export type PtyAck = z.infer<typeof PtyAck>

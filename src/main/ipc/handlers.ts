@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { dialog, ipcMain } from 'electron'
 import { channels } from '@shared/channels'
-import { CloseChoice, PtyAck } from '@shared/ipc'
+import { CloseChoice, ContextMenuRequest, PtyAck } from '@shared/ipc'
 import { WindowSnapshot } from '@shared/session'
 import { ok } from '@shared/result'
 import type { ConfigService, KeymapService } from '../config/service'
@@ -21,6 +21,7 @@ import type { ExpectedWrites } from '../watch/expected'
 import type { WatchService } from '../watch/service'
 import type { WindowRegistry } from '../windows'
 import { handle } from './register'
+import { showContextMenu } from '../menu'
 
 const isTest = process.env['MORU_TEST'] === '1'
 
@@ -90,6 +91,11 @@ export const registerHandlers = ({
   handle('search.replace', async (plan) => ok(await replace.replace(plan)))
 
   handle('search.undoLast', async () => ok({ report: await replace.undoLast() }))
+
+  ipcMain.on(channels.menuContext, (event, raw: unknown) => {
+    const parsed = ContextMenuRequest.safeParse(raw)
+    if (parsed.success && !isTest) showContextMenu(event.sender, parsed.data)
+  })
 
   ipcMain.on(channels.sessionSave, (event, raw: unknown) => {
     const parsed = WindowSnapshot.safeParse(raw)

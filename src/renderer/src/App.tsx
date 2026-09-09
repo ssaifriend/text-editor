@@ -76,7 +76,12 @@ export const App = () => {
     onSignal(
       () => ws.state.projectRoot,
       (root) => {
-        if (root) void invoke('index.build', { root })
+        if (!root) return
+        void invoke('index.build', { root }).then((result) =>
+          R.tap(result, ({ files, truncated }) => {
+            if (truncated) ws.setStatus(`file index truncated at ${files.toLocaleString()} files — open a narrower folder for Goto Anything`)
+          }),
+        )
       },
     ),
   )

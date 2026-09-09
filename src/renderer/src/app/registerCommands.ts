@@ -51,6 +51,24 @@ export const registerAppCommands = (registry: CommandRegistry, ws: Workspace, ui
     { id: 'palette.gotoWord', title: 'Goto Word…', when: 'hasBuffer', run: () => ui.openPalette('goto', '#') },
     { id: 'find.open', title: 'Find', when: 'hasBuffer', run: () => ws.openFind(false) },
     { id: 'search.project', title: 'Find in Files…', run: () => ws.openSearch() },
+    {
+      id: 'file.copyPath',
+      title: 'File: Copy Path',
+      when: 'hasBuffer',
+      run: () => {
+        const path = ws.activeBuffer()?.meta?.path
+        if (path) void navigator.clipboard.writeText(path).then(() => ws.setStatus(`copied ${path}`))
+      },
+    },
+    {
+      id: 'sidebar.reveal',
+      title: 'File: Reveal in Sidebar',
+      when: 'hasBuffer',
+      run: () => {
+        const path = ws.activeBuffer()?.meta?.path
+        if (path) void ws.revealInSidebar(path)
+      },
+    },
     { id: 'search.undoReplace', title: 'Undo Replace in Files', run: () => void ws.searchUndoReplace() },
     { id: 'markdown.togglePreview', title: 'Markdown: Toggle Preview', run: () => ws.togglePreview() },
     { id: 'markdown.exportHtml', title: 'Markdown: Export HTML…', run: () => void ws.exportMarkdown(null, 'html') },

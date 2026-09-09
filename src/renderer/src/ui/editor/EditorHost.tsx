@@ -51,6 +51,19 @@ export const EditorHost = (props: Props) => {
       onMouseDown={() => props.ws.focusPane(props.leaf().id)}
       onFocusIn={() => props.ws.setEditorFocus(props.leaf().id, true)}
       onFocusOut={() => props.ws.setEditorFocus(props.leaf().id, false)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        props.ws.focusPane(props.leaf().id)
+        const view = props.ws.activeView()
+        const buffer = props.ws.activeBuffer()
+        window.moru.send('menu.context', {
+          kind: 'editor',
+          hasSelection: view ? view.state.selection.ranges.some((r) => !r.empty) : false,
+          languageId: buffer?.languageId ?? 'plain',
+          path: buffer?.meta?.path ?? null,
+          hasTerminal: props.ws.activeTerminalId() !== null || Object.values(props.ws.state.terminals).some((t) => t.alive),
+        })
+      }}
     />
   )
 }
