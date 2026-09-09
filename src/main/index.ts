@@ -112,8 +112,9 @@ app.whenReady().then(async () => {
   ): BrowserWindow => {
     const window = createWindow(bounds)
     const info = windows.add({ window, startupPaths: paths, projectRoot, session })
+    const contents = window.webContents
     window.on('closed', () => {
-      ptyManager.killOwnedBy(window.webContents)
+      ptyManager.killOwnedBy(contents)
       windows.remove(info.windowId)
       if (!quitting) sessionStore.remove(info.windowId)
     })
