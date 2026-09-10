@@ -1,6 +1,7 @@
 type Props = {
   readonly direction: 'row' | 'col'
   readonly onDrag: (deltaPx: number) => void
+  readonly class?: string
 }
 
 export const SplitGutter = (props: Props) => {
@@ -25,7 +26,8 @@ export const SplitGutter = (props: Props) => {
   return (
     <div
       class="gutter"
-      classList={{ row: props.direction === 'row', col: props.direction === 'col' }}
+      classList={{ row: props.direction === 'row', col: props.direction === 'col', [props.class ?? '']: props.class !== undefined }}
+      data-testid={props.class ?? 'gutter'}
       onMouseDown={start}
     />
   )

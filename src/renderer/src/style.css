@@ -335,6 +335,19 @@ html, body, #root {
 .tree-icon { width: 16px; height: 16px; flex: none; }
 .tree-icon.dir { color: #e6b455; }
 .tree-icon.file { color: color-mix(in srgb, var(--fg) 65%, transparent); }
+.tree-icon.file.image { color: #4fa3c7; }
+.tree-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: #fff;
+  font: 700 8px/1 ui-monospace, Menlo, Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+.tree-badge.long { font-size: 6.5px; letter-spacing: -0.04em; }
+.sidebar-gutter { position: absolute; top: 0; right: -2px; width: 5px; height: 100%; background: transparent; z-index: 5; flex: none; }
+.sidebar-gutter:hover, .sidebar-gutter:active { background: color-mix(in srgb, var(--fg) 25%, transparent); }
 .tree-name { overflow: hidden; text-overflow: ellipsis; }
 
 .mod-held .cm-path-link { text-decoration: underline; cursor: pointer; }

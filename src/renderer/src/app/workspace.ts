@@ -135,7 +135,7 @@ export type WorkspaceState = {
   mru: string[]
   searches: Record<string, SearchState>
   searchFocused: boolean
-  sidebar: { open: boolean; expanded: Record<string, true>; entries: Record<string, TreeEntry[]> }
+  sidebar: { open: boolean; width: number; expanded: Record<string, true>; entries: Record<string, TreeEntry[]> }
   activePane: PaneId
   editorFocused: boolean
   terminalFocused: boolean
@@ -224,6 +224,7 @@ export type Workspace = {
   readonly exportMarkdown: (bufferId: BufferId | null, kind: 'html' | 'pdf') => Promise<void>
   readonly copyMarkdownHtml: (bufferId: BufferId | null) => Promise<void>
   readonly toggleSidebar: () => void
+  readonly setSidebarWidth: (px: number) => void
   readonly revealInSidebar: (path: string) => Promise<void>
   readonly expandDir: (dir: string) => Promise<void>
   readonly collapseDir: (dir: string) => void
@@ -312,7 +313,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     mru: [],
     searches: {},
     searchFocused: false,
-    sidebar: { open: true, expanded: {}, entries: {} },
+    sidebar: { open: true, width: 240, expanded: {}, entries: {} },
     activePane: firstPane,
     editorFocused: false,
     terminalFocused: false,
@@ -1068,6 +1069,8 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
 
   const toggleSidebar = (): void => setState('sidebar', 'open', !state.sidebar.open)
 
+  const setSidebarWidth = (px: number): void => setState('sidebar', 'width', Math.round(Math.min(600, Math.max(160, px))))
+
   const parentDir = (path: string): string => dirnameOf(path) ?? path
 
   const createFileIn = async (dir: string, name: string): Promise<void> => {
@@ -1359,7 +1362,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
   const snapshot = (): WindowSnapshot => ({
     windowId: state.windowId,
     projectRoot: state.projectRoot,
-    sidebar: { open: state.sidebar.open, expanded: Object.keys(state.sidebar.expanded) },
+    sidebar: { open: state.sidebar.open, width: state.sidebar.width, expanded: Object.keys(state.sidebar.expanded) },
     layout: paneSnapshot(currentTree),
     activePath: pathToLeaf(currentTree, state.activePane) ?? [],
     findHistory: [...state.find.history],
@@ -1447,6 +1450,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     for (const entry of dirtyEntries) await invoke('dirty.clear', entry.id)
 
     setState('sidebar', 'open', snap.sidebar.open)
+    if (snap.sidebar.width) setSidebarWidth(snap.sidebar.width)
     if (snap.findHistory) setState('find', 'history', [...snap.findHistory])
     if (snap.recentFiles) setState('mru', [...snap.recentFiles])
     for (const dir of snap.sidebar.expanded) await expandDir(dir)
@@ -1799,6 +1803,7 @@ export const createWorkspace = ({ confirmClose, settings, dirtySync }: Deps): Wo
     exportMarkdown,
     copyMarkdownHtml,
     toggleSidebar,
+    setSidebarWidth,
     revealInSidebar,
     expandDir,
     collapseDir,

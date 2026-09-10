@@ -53,7 +53,7 @@ export const PaneSnapshot: z.ZodType<PaneSnapshot> = z.lazy(() =>
 export const WindowSnapshot = z.object({
   windowId: z.string(),
   projectRoot: z.string().nullable(),
-  sidebar: z.object({ open: z.boolean(), expanded: z.array(z.string()) }),
+  sidebar: z.object({ open: z.boolean(), expanded: z.array(z.string()), width: z.number().int().positive().optional() }),
   layout: PaneSnapshot,
   activePath: z.array(z.number().int().nonnegative()),
   findHistory: z.array(z.string()).optional(),
