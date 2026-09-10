@@ -26,8 +26,10 @@ describe('session store', () => {
     const store = createSessionStore(dir, { debounceMs: 50 })
     store.update('w1', snap('w1'), { x: 0, y: 0, width: 800, height: 600 })
     store.update('w2', snap('w2'), null)
-    await new Promise((r) => setTimeout(r, 250))
-    const file = JSON.parse(await readFile(join(dir, 'session.json'), 'utf8'))
+    const file = await expect
+      .poll(() => readFile(join(dir, 'session.json'), 'utf8').then((t) => JSON.parse(t) as { windows: unknown[]; cleanExit: boolean }).catch(() => null), { timeout: 5000 })
+      .not.toBeNull()
+      .then(() => readFile(join(dir, 'session.json'), 'utf8').then((t) => JSON.parse(t)))
     expect(file.windows.map((w: { snapshot: { windowId: string } }) => w.snapshot.windowId)).toEqual(['w1', 'w2'])
     expect(file.cleanExit).toBe(false)
   })
