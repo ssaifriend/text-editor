@@ -18,7 +18,7 @@ const project = () => {
 test('closing the last tab leaves an untitled buffer; status bar shows a root-relative path at fixed height', async () => {
   const root = project()
   const { app, page } = await launchApp({ MORU_TEST_ROOT: root, MORU_TEST_OPEN: join(root, 'src', 'a.ts') })
-  await expect(page.getByTestId('path')).toHaveText('src/a.ts')
+  await expect(page.getByTestId('path')).toHaveText(join('src', 'a.ts'))
   const height = await page.evaluate(() => document.querySelector('.statusbar')!.getBoundingClientRect().height)
   expect(Math.round(height)).toBe(24)
 
