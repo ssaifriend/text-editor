@@ -23,6 +23,7 @@ export const installSessionSync = (ws: Workspace, { send, debounceMs = 500, tick
     ws.state.activePane
     ws.state.projectRoot
     ws.state.sidebar.open
+    ws.state.sidebar.width
     Object.keys(ws.state.sidebar.expanded)
     Object.values(ws.state.tabs).length
     Object.values(ws.state.buffers).forEach((b) => {
